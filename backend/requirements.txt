@@ -1,0 +1,5 @@
+# Installed into backend/.env by `npm run setup` (conda-forge); listed here for reference.
+fastapi
+uvicorn
+pydantic
+# openbabel (conda-forge: provides obabel). AutoDock Vina is downloaded to tools/vina/ by the setup script.

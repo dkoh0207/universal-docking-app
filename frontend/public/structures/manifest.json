@@ -1,0 +1,8 @@
+[
+  {"id": "1UBQ", "name": "Ubiquitin", "desc": "Small regulatory protein, 76 residues", "tag": "Protein", "name_ko": "유비퀴틴", "desc_ko": "76개 잔기로 된 작은 조절 단백질", "tag_ko": "단백질"},
+  {"id": "4HHB", "name": "Hemoglobin", "desc": "Deoxy human hemoglobin, 4 chains + heme", "tag": "Complex", "name_ko": "헤모글로빈", "desc_ko": "탈산소 인간 헤모글로빈, 4개 사슬 + 헴", "tag_ko": "복합체"},
+  {"id": "1HSG", "name": "HIV-1 protease", "desc": "Homodimer bound to indinavir (MK1)", "tag": "Drug target", "name_ko": "HIV-1 단백질분해효소", "desc_ko": "인디나비르(MK1)와 결합한 동종이량체", "tag_ko": "약물 표적"},
+  {"id": "6LU7", "name": "SARS-CoV-2 Mpro", "desc": "Main protease with N3 inhibitor", "tag": "Drug target", "name_ko": "SARS-CoV-2 Mpro", "desc_ko": "N3 억제제와 결합한 주 단백질분해효소", "tag_ko": "약물 표적"},
+  {"id": "1CRN", "name": "Crambin", "desc": "Plant seed protein, 0.945 Å resolution", "tag": "Protein", "name_ko": "크램빈", "desc_ko": "식물 종자 단백질, 0.945 Å 해상도", "tag_ko": "단백질"},
+  {"id": "1BNA", "name": "B-DNA dodecamer", "desc": "Dickerson–Drew dodecamer", "tag": "Nucleic acid", "name_ko": "B-DNA 12량체", "desc_ko": "Dickerson–Drew 12량체", "tag_ko": "핵산"}
+]

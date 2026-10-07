@@ -1,0 +1,14 @@
+{
+  "name": "pymol-web",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "setup": "node scripts/setup.mjs",
+    "build": "npm --prefix frontend run build",
+    "start": "bash server.sh start prod",
+    "stop": "bash server.sh stop",
+    "status": "bash server.sh status"
+  }
+}

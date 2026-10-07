@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>PyMOL Web</title>
+  </head>
+  <body>
+    <div id="app" data-page="viewer">
+      <header class="topbar">
+        <div class="brand">
+          <img src="/favicon.svg" alt="" class="brand-mark" />
+          <div class="brand-text">
+            <strong>PyMOL Web</strong>
+            <span data-i18n="brand.sub">RCSB structure viewer</span>
+          </div>
+        </div>
+
+        <div class="segmented page-tabs" id="page-tabs">
+          <button data-v="viewer" class="active"><i data-lucide="atom"></i><span data-i18n="tab.viewer">Viewer</span></button>
+          <button data-v="dock"><i data-lucide="anchor"></i><span data-i18n="tab.dock">Docking</span></button>
+        </div>
+
+        <form class="fetch" id="fetch-form" autocomplete="off">
+          <i data-lucide="search"></i>
+          <input id="fetch-input" data-i18n-placeholder="fetch.placeholder" placeholder="PDB ID, e.g. 4HHB" maxlength="4" spellcheck="false" />
+          <button type="submit" class="btn primary sm" data-i18n="fetch.btn">Fetch</button>
+        </form>
+
+        <div class="dropdown" id="examples">
+          <button class="btn ghost" id="examples-btn"><i data-lucide="flask-conical"></i><span data-i18n="examples">Examples</span><i data-lucide="chevron-down" class="chev"></i></button>
+          <div class="menu" id="examples-menu"></div>
+        </div>
+
+        <label class="btn ghost" data-i18n-title="upload.title">
+          <i data-lucide="upload"></i><span data-i18n="upload">Upload</span>
+          <input type="file" id="file-input" accept=".pdb,.ent,.cif,.mmcif,.sdf,.mol,.mol2,.xyz,.pqr" hidden />
+        </label>
+
+        <div class="spacer"></div>
+
+        <div class="segmented top-switch" id="theme-switch">
+          <button data-v="light"><i data-lucide="sun"></i><span data-i18n="theme.light">Light</span></button>
+          <button data-v="dark"><i data-lucide="moon"></i><span data-i18n="theme.dark">Dark</span></button>
+        </div>
+        <div class="segmented top-switch" id="lang-switch">
+          <button data-v="en"><i data-lucide="languages"></i>EN</button>
+          <button data-v="ko">한국어</button>
+        </div>
+      </header>
+
+      <aside class="sidebar viewer-only" id="sidebar">
+        <section class="card target-card">
+          <div class="field-label"><i data-lucide="target"></i><span data-i18n="target">Apply to</span></div>
+          <select id="target" class="select"></select>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="layers"></i><span data-i18n="card.rep">Representation</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <div class="segmented" id="rep-mode">
+              <button data-mode="toggle" class="active" data-i18n="rep.toggle">Toggle</button>
+              <button data-mode="as" data-i18n="rep.as">Show only</button>
+            </div>
+            <div class="rep-grid" id="rep-grid"></div>
+            <div class="pair">
+              <button class="btn soft" data-cmd="hide everything, {t}"><i data-lucide="eye-off"></i><span data-i18n="hideAll">Hide all</span></button>
+              <button class="btn soft" data-cmd="preset.simple {t}"><i data-lucide="rotate-ccw"></i><span data-i18n="default">Default</span></button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="palette"></i><span data-i18n="card.color">Color</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <div class="scheme-list" id="scheme-list"></div>
+            <label class="check"><input type="checkbox" id="keep-hetero" checked /><span data-i18n="keepHetero">Keep heteroatom colors (N, O, S…)</span></label>
+          </div>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="cloud"></i><span data-i18n="card.surface">Surface</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <div class="segmented" id="surface-type">
+              <button data-v="VDW" data-i18n="surf.vdw">Van der Waals</button>
+              <button data-v="SAS" data-i18n="surf.sas">Solvent acc.</button>
+              <button data-v="SES" data-i18n="surf.ses">Molecular</button>
+            </div>
+            <label class="slider"><span data-i18n="transparency">Transparency</span><input type="range" min="0" max="0.9" step="0.05" value="0" data-setting="transparency" /><output></output></label>
+            <label class="slider" id="ligand-region" data-i18n-title="ligandRegion.title"><span data-i18n="ligandRegion">Distance to ligand center</span><input type="range" id="ligand-cutoff" min="0" max="30" step="1" value="0" /><output id="ligand-cutoff-out"></output></label>
+          </div>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="sliders-horizontal"></i><span data-i18n="card.style">Style</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <label class="field"><span data-i18n="cartoon">Cartoon</span>
+              <select class="select" id="cartoon-style">
+                <option value="automatic" data-i18n="cs.automatic">Automatic</option><option value="oval" data-i18n="cs.oval">Oval</option>
+                <option value="rectangle" data-i18n="cs.rectangle">Rectangle</option><option value="tube" data-i18n="cs.tube">Tube helices</option>
+                <option value="trace" data-i18n="cs.trace">Trace</option><option value="parabola" data-i18n="cs.parabola">Parabola</option>
+                <option value="edged" data-i18n="cs.edged">Edged</option>
+              </select>
+            </label>
+            <label class="slider"><span data-i18n="cartoonTransparency">Cartoon transparency</span><input type="range" min="0" max="0.9" step="0.05" value="0" data-setting="cartoon_transparency" /><output></output></label>
+            <label class="slider"><span data-i18n="stickRadius">Stick radius</span><input type="range" min="0.08" max="0.5" step="0.01" value="0.22" data-setting="stick_radius" /><output></output></label>
+            <label class="slider"><span data-i18n="sphereScale">Sphere scale</span><input type="range" min="0.2" max="1.5" step="0.05" value="1" data-setting="sphere_scale" /><output></output></label>
+          </div>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="contrast"></i><span data-i18n="card.scene">Scene</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <div class="toggles">
+              <label class="switch" id="water-switch"><input type="checkbox" id="water-toggle" /><span></span><em data-i18n="water">Water (ball &amp; stick)</em></label>
+              <label class="switch"><input type="checkbox" data-toggle="fog" checked /><span></span><em data-i18n="fog">Depth cue (fog)</em></label>
+              <label class="switch"><input type="checkbox" data-toggle="outline" /><span></span><em data-i18n="outline">Outline</em></label>
+              <label class="switch"><input type="checkbox" data-toggle="orthoscopic" /><span></span><em data-i18n="ortho">Orthographic</em></label>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="wand-sparkles"></i><span data-i18n="card.presets">Presets</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body preset-grid">
+            <button class="preset" data-cmd="preset.simple {t}"><i data-lucide="spline"></i><span data-i18n="preset.simple">Simple</span></button>
+            <button class="preset" data-cmd="preset.ligand_sites {t}"><i data-lucide="target"></i><span data-i18n="preset.ligand">Ligand sites</span></button>
+            <button class="preset" data-cmd="preset.pretty_surface {t}"><i data-lucide="cloud"></i><span data-i18n="preset.surface">Pretty surface</span></button>
+            <button class="preset" data-cmd="preset.publication {t}"><i data-lucide="image"></i><span data-i18n="preset.publication">Publication</span></button>
+            <button class="preset" data-cmd="preset.ball_and_stick {t}"><i data-lucide="atom"></i><span data-i18n="preset.ballstick">Ball &amp; stick</span></button>
+            <button class="preset" data-cmd="preset.b_factor {t}"><i data-lucide="activity"></i><span data-i18n="preset.bfactor">B-factor</span></button>
+          </div>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="microscope"></i><span data-i18n="card.analysis">Analysis</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <div class="pair">
+              <button class="btn soft" id="contacts-btn" data-i18n-title="contacts.title"><i data-lucide="network"></i><span>Polar contacts</span></button>
+              <button class="btn soft" id="pocket-btn" data-i18n-title="pocket.title"><i data-lucide="focus"></i><span>Ligand pocket</span></button>
+            </div>
+            <div class="field-label sm" data-i18n="measureHint">Measure (click atoms in the viewer)</div>
+            <div class="segmented" id="measure-mode">
+              <button data-m="distance"><i data-lucide="ruler"></i><span data-i18n="distance">Distance</span></button>
+              <button data-m="angle"><i data-lucide="triangle"></i><span data-i18n="angle">Angle</span></button>
+              <button data-m="dihedral"><i data-lucide="axis-3d"></i><span data-i18n="dihedral">Dihedral</span></button>
+            </div>
+            <div class="field-label sm" data-i18n="mouseSelects">Mouse selects</div>
+            <div class="segmented" id="pick-mode">
+              <button data-v="atoms" data-i18n="atoms">Atoms</button>
+              <button data-v="residues" class="active" data-i18n="residues">Residues</button>
+              <button data-v="chains" data-i18n="chains">Chains</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card info-card" id="info"></section>
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="boxes"></i><span data-i18n="objects">Objects</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body list" id="objects"></div>
+        </section>
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="mouse-pointer-click"></i><span data-i18n="selections">Selections</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body list" id="selections"></div>
+        </section>
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="ruler"></i><span data-i18n="measurements">Measurements</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body list" id="measurements"></div>
+        </section>
+      </aside>
+
+      <main class="stage viewer-only">
+        <div class="seqbar" id="seqbar"><div class="seq-empty" data-i18n="seq.empty">Sequence appears here</div></div>
+        <div class="viewport-wrap" id="viewport-wrap">
+          <div id="viewport"></div>
+          <div class="tooltip" id="tooltip"></div>
+          <div class="mode-badge" id="mode-badge"></div>
+          <div class="busy" id="busy"><span class="spinner"></span><span id="busy-text"></span></div>
+          <div class="drop-hint" id="drop-hint"><i data-lucide="upload"></i><span data-i18n="drop">Drop a structure file to load it</span></div>
+          <div class="empty" id="empty">
+            <i data-lucide="atom"></i>
+            <h2 data-i18n="empty.title">Load a structure</h2>
+            <p data-i18n="empty.text">Pick an example, fetch any PDB ID, or drop a file here.</p>
+            <div class="empty-examples" id="empty-examples"></div>
+          </div>
+          <nav class="toolbar" id="toolbar">
+            <button data-cmd="reset" data-i18n-title="tb.reset"><i data-lucide="rotate-ccw"></i></button>
+            <button data-cmd="orient {t}" data-i18n-title="tb.orient"><i data-lucide="axis-3d"></i></button>
+            <button data-cmd="zoom {t}" data-i18n-title="tb.zoom"><i data-lucide="scan"></i></button>
+            <button data-cmd="center {t}" data-i18n-title="tb.center"><i data-lucide="crosshair"></i></button>
+            <span class="sep"></span>
+            <button data-cmd="spin" id="spin-btn" data-i18n-title="tb.spin"><i data-lucide="orbit"></i></button>
+            <button data-cmd="rock" id="rock-btn" data-i18n-title="tb.rock"><i data-lucide="move-3d"></i></button>
+            <div class="pop">
+              <button id="clip-btn" data-i18n-title="tb.clip"><i data-lucide="scissors"></i></button>
+              <div class="popover" id="clip-pop">
+                <label class="slider"><span data-i18n="tb.frontClip">Front clip</span><input type="range" id="clip-range" min="0" max="0.98" step="0.02" value="0" /></label>
+              </div>
+            </div>
+            <span class="sep"></span>
+            <button id="measure-btn" data-i18n-title="tb.measure"><i data-lucide="ruler"></i></button>
+            <button data-cmd="png" data-i18n-title="tb.png"><i data-lucide="camera"></i></button>
+            <button id="fullscreen-btn" data-i18n-title="tb.fullscreen"><i data-lucide="maximize"></i></button>
+          </nav>
+        </div>
+      </main>
+
+      <aside class="sidebar dock-only" id="dock-sidebar">
+        <section class="card" id="dk-status"></section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="dna"></i><span data-i18n="dock.receptor">Receptor</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <select id="dk-receptor" class="select"></select>
+            <div class="toggles">
+              <label class="switch"><input type="checkbox" id="dk-nowater" checked /><span></span><em data-i18n="dock.noWater">Remove water</em></label>
+              <label class="switch"><input type="checkbox" id="dk-keep" /><span></span><em data-i18n="dock.keepHet">Keep metals &amp; cofactors</em></label>
+            </div>
+            <div class="hint" id="dk-receptor-info"></div>
+          </div>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="pill"></i><span data-i18n="dock.ligand">Ligand</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <div class="segmented" id="dk-lig-src">
+              <button data-v="structure" class="active" data-i18n="dock.src.structure">Structure</button>
+              <button data-v="upload" data-i18n="dock.src.upload">Upload</button>
+              <button data-v="smiles" data-i18n="dock.src.smiles">SMILES</button>
+            </div>
+            <div id="dk-pane-structure">
+              <div class="lig-chips" id="dk-lig-chips"></div>
+              <div class="hint" data-i18n="dock.structureHint">Pick a ligand of the receptor structure to re-dock it into its own pocket.</div>
+            </div>
+            <div id="dk-pane-upload" class="hidden">
+              <label class="btn soft file-btn"><i data-lucide="upload"></i><span data-i18n="dock.chooseFile">Choose .sdf / .mol2 / .pdb</span>
+                <input type="file" id="dk-lig-file" accept=".sdf,.mol,.mol2,.pdb" hidden /></label>
+              <div class="hint" id="dk-lig-file-name"></div>
+            </div>
+            <div id="dk-pane-smiles" class="hidden">
+              <input class="input" id="dk-smiles" spellcheck="false" autocomplete="off" data-i18n-placeholder="dock.smilesPlaceholder" placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O" />
+              <div class="hint" data-i18n="dock.smilesHint">A 3D structure is generated for you.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="box"></i><span data-i18n="dock.box">Search box</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <div class="pair">
+              <button class="btn soft" id="dk-center-lig"><i data-lucide="crosshair"></i><span data-i18n="dock.centerLig">Center on ligand</span></button>
+              <button class="btn soft" id="dk-center-sel"><i data-lucide="mouse-pointer-click"></i><span data-i18n="dock.centerSel">Viewer selection</span></button>
+            </div>
+            <div class="xyz" id="dk-center"><span data-i18n="dock.center">Center</span>
+              <input class="input" type="number" step="0.5" data-i="0" placeholder="x" /><input class="input" type="number" step="0.5" data-i="1" placeholder="y" /><input class="input" type="number" step="0.5" data-i="2" placeholder="z" /></div>
+            <div class="xyz" id="dk-size"><span data-i18n="dock.size">Size (Å)</span>
+              <input class="input" type="number" step="1" min="1" max="126" value="20" data-i="0" /><input class="input" type="number" step="1" min="1" max="126" value="20" data-i="1" /><input class="input" type="number" step="1" min="1" max="126" value="20" data-i="2" /></div>
+            <label class="slider"><span data-i18n="dock.padding">Padding around ligand</span><input type="range" id="dk-padding" min="0" max="20" step="1" value="8" /><output id="dk-padding-out">8 Å</output></label>
+          </div>
+        </section>
+
+        <section class="card" data-collapsible>
+          <h3><i data-lucide="settings-2"></i><span data-i18n="dock.params">Parameters</span><i data-lucide="chevron-down" class="chev"></i></h3>
+          <div class="body">
+            <label class="field"><span data-i18n="dock.exh">Exhaustiveness</span><input class="input" type="number" id="dk-exh" min="1" max="64" value="8" /></label>
+            <label class="field"><span data-i18n="dock.modes">Poses</span><input class="input" type="number" id="dk-modes" min="1" max="20" value="9" /></label>
+            <label class="field"><span data-i18n="dock.erange">Energy range</span><input class="input" type="number" id="dk-erange" min="1" max="20" step="0.5" value="3" /></label>
+            <label class="field"><span data-i18n="dock.scoring">Scoring</span>
+              <select class="select" id="dk-scoring"><option value="vina">Vina</option><option value="vinardo">Vinardo</option></select></label>
+            <label class="field"><span data-i18n="dock.seed">Seed</span><input class="input" type="number" id="dk-seed" min="0" data-i18n-placeholder="dock.random" placeholder="random" /></label>
+            <label class="field"><span data-i18n="dock.cpu">CPU threads</span><input class="input" type="number" id="dk-cpu" min="1" data-i18n-placeholder="dock.all" placeholder="all" /></label>
+          </div>
+        </section>
+
+        <section class="card run-card" id="dk-run-card">
+          <button class="btn primary run-btn" id="dk-run"><i data-lucide="play"></i><span data-i18n="dock.run">Run docking</span></button>
+          <div class="run-stage hidden" id="dk-stage"></div>
+          <div class="progress hidden" id="dk-progress"><i></i></div>
+          <button class="log-toggle hidden" id="dk-log-toggle"><i data-lucide="terminal"></i><span data-i18n="dock.log">Log</span><i data-lucide="chevron-down" class="chev"></i></button>
+          <pre class="log hidden" id="dk-log"></pre>
+        </section>
+
+        <section class="card hidden" id="dk-results-card">
+          <h3><i data-lucide="trophy"></i><span data-i18n="dock.results">Results</span></h3>
+          <div class="results-table" id="dk-results"></div>
+          <div class="toggles">
+            <label class="switch"><input type="checkbox" id="dk-all" /><span></span><em data-i18n="dock.showAll">Show all poses</em></label>
+          </div>
+          <div class="pair">
+            <button class="btn soft" id="dk-contacts"><i data-lucide="network"></i><span data-i18n="contacts">Polar contacts</span></button>
+            <button class="btn soft" id="dk-send"><i data-lucide="send"></i><span data-i18n="dock.send">Send to Viewer</span></button>
+          </div>
+          <button class="btn soft" id="dk-download"><i data-lucide="download"></i><span data-i18n="dock.download">Download out.pdbqt</span></button>
+        </section>
+      </aside>
+
+      <main class="stage dock-only" id="dock-stage">
+        <div class="viewport-wrap" id="dock-wrap">
+          <div id="dock-viewport"></div>
+          <div class="empty hidden" id="dock-empty">
+            <i data-lucide="anchor"></i>
+            <h2 data-i18n="dock.empty.title">Set up a docking run</h2>
+            <p data-i18n="dock.empty.text">Load a structure in the Viewer, then pick it as the receptor.</p>
+          </div>
+          <div class="dock-legend" id="dock-legend"></div>
+          <nav class="toolbar" id="dock-toolbar">
+            <button data-dk="reset" data-i18n-title="tb.reset"><i data-lucide="rotate-ccw"></i></button>
+            <button data-dk="zoom" data-i18n-title="dock.tb.zoom"><i data-lucide="scan"></i></button>
+            <button data-dk="box" id="dk-box-btn" data-i18n-title="dock.tb.box"><i data-lucide="box"></i></button>
+            <span class="sep"></span>
+            <button data-dk="png" data-i18n-title="tb.png"><i data-lucide="camera"></i></button>
+            <button data-dk="fullscreen" data-i18n-title="tb.fullscreen"><i data-lucide="maximize"></i></button>
+          </nav>
+        </div>
+      </main>
+    </div>
+    <div class="toasts" id="toasts"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
