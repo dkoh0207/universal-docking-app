@@ -413,7 +413,7 @@ export class Scene extends EventTarget implements SelectionContext {
   toggleInSele(group: PAtom[], forceAdd = false) {
     const sele = this.selections.get("sele") ?? new Set<PAtom>();
     const all = group.every((a) => sele.has(a));
-    for (const a of group) (all && !forceAdd ? sele.delete(a) : sele.add(a));
+    for (const a of group) { if (all && !forceAdd) sele.delete(a); else sele.add(a); }
     if (sele.size) this.selections.set("sele", sele); else this.selections.delete("sele");
     this.indicated = sele.size ? "sele" : null;
     this.update();

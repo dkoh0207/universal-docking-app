@@ -46,38 +46,44 @@ export function splitModels(pdbqt: string): string[] {
   return models;
 }
 
-/** Heavy-atom coordinates of a PDB/PDBQT text, by atom name. */
-export function heavyByName(text: string) {
-  const m = new Map<string, [number, number, number]>();
-  for (const l of text.split("\n")) {
-    if (!/^(ATOM  |HETATM)/.test(l)) continue;
-    const name = l.slice(12, 16).trim();
-    const type = l.slice(77, 79).trim().toUpperCase() || l.slice(76, 78).trim().toUpperCase();
-    if (type === "H" || type === "HD" || (!type && name.startsWith("H"))) continue;
-    if (!m.has(name)) m.set(name, [+l.slice(30, 38), +l.slice(38, 46), +l.slice(46, 54)]);
-  }
-  return m;
-}
-
-/** RMSD between two atom sets matched by name (no superposition); null unless most atoms match. */
-export function rmsdByName(pose: ReturnType<typeof heavyByName>, ref: ReturnType<typeof heavyByName>) {
-  let n = 0, sum = 0;
-  for (const [k, r] of ref) {
-    const p = pose.get(k);
-    if (!p) continue;
-    n++;
-    sum += (p[0] - r[0]) ** 2 + (p[1] - r[1]) ** 2 + (p[2] - r[2]) ** 2;
-  }
-  return n && n >= 0.8 * ref.size ? Math.sqrt(sum / n) : null;
-}
-
 const AD_ELEMENT: Record<string, string> = { A: "C", NA: "N", OA: "O", SA: "S", HD: "H", HS: "H", Cl: "CL", Br: "BR", Zn: "ZN", Mg: "MG", Mn: "MN", Fe: "FE", Ca: "CA" };
+
+/** Heavy atoms (element + coordinates) of a PDB/PDBQT text. Atom names are not used: Open Babel 3.1 writes bare elements. */
+export function heavyAtoms(text: string) {
+  const atoms: { el: string; xyz: [number, number, number] }[] = [];
+  for (const l of text.split("\n")) {
+    if (!/^(ATOM {2}|HETATM)/.test(l)) continue;
+    const type = (l.slice(77, 79).trim() || l.slice(76, 78).trim());
+    const el = (AD_ELEMENT[type] ?? type).toUpperCase() || l.slice(12, 16).trim().replace(/\d/g, "")[0]?.toUpperCase() || "";
+    if (el === "H" || !el) continue;
+    atoms.push({ el, xyz: [+l.slice(30, 38), +l.slice(38, 46), +l.slice(46, 54)] });
+  }
+  return atoms;
+}
+
+/**
+ * Symmetric RMSD between two heavy-atom sets, no superposition: every atom is paired with the nearest atom of the same
+ * element in the other set, and both directions are pooled. This ignores atom naming and order, and so symmetric
+ * ligands are not penalized; null unless the sets are the same size.
+ */
+export function rmsdNearest(pose: ReturnType<typeof heavyAtoms>, ref: ReturnType<typeof heavyAtoms>) {
+  if (!ref.length || pose.length !== ref.length) return null;
+  let sum = 0;
+  const nearest = (a: (typeof ref)[number], set: typeof ref) => {
+    let best = Infinity;
+    for (const b of set) if (b.el === a.el) best = Math.min(best, (a.xyz[0] - b.xyz[0]) ** 2 + (a.xyz[1] - b.xyz[1]) ** 2 + (a.xyz[2] - b.xyz[2]) ** 2);
+    return best;
+  };
+  for (const a of ref) sum += nearest(a, pose);
+  for (const a of pose) sum += nearest(a, ref);
+  return Number.isFinite(sum) ? Math.sqrt(sum / (ref.length + pose.length)) : null;
+}
 
 /** One Vina pose as plain PDB: AutoDock atom types (OA, HD, A…) become element symbols, which 3Dmol's pdbqt parser does not do. */
 export function pdbqtToPdb(text: string): string {
   const out: string[] = [];
   for (const l of text.split("\n")) {
-    if (!/^(ATOM  |HETATM)/.test(l)) continue;
+    if (!/^(ATOM {2}|HETATM)/.test(l)) continue;
     const type = l.slice(77, 79).trim();
     const elem = (AD_ELEMENT[type] ?? type).toUpperCase();
     out.push(l.slice(0, 66).padEnd(76) + elem.padStart(2));

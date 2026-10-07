@@ -1,5 +1,7 @@
-// UI strings in English and Korean. Static markup uses data-i18n / data-i18n-title /
-// data-i18n-placeholder attributes; code calls t(). Switching language fires "langchange".
+// UI strings in English and Korean. Components call useT(); other code calls t().
+// Switching language fires "langchange".
+
+import { useSyncExternalStore } from "react";
 
 export type Lang = "en" | "ko";
 
@@ -170,9 +172,16 @@ const STRINGS = {
   "dock.backend": ["Backend", "백엔드"],
   "dock.recheck": ["Check again", "다시 확인"],
   "dock.status.checking": ["Checking the backend…", "백엔드 확인 중…"],
-  "dock.status.ok": ["Ready · Vina {vina} · Open Babel {obabel}", "준비됨 · Vina {vina} · Open Babel {obabel}"],
+  "dock.status.ok": ["Ready · {engine} {ver} · Open Babel {obabel}", "준비됨 · {engine} {ver} · Open Babel {obabel}"],
   "dock.status.offline": ["Backend offline - run `npm run dev`", "백엔드에 연결할 수 없습니다 - `npm run dev`를 실행하세요"],
-  "dock.status.missing": ["Missing: {tools} - run `npm run setup`", "설치되지 않음: {tools} - `npm run setup`을 실행하세요"],
+  "dock.status.missing": ["Missing: {tools} - run `{cmd}`", "설치되지 않음: {tools} - `{cmd}`을 실행하세요"],
+  "dock.status.notInstalled": ["not installed", "설치되지 않음"],
+  "dock.engine": ["Engine", "엔진"],
+  "dock.cnnScoring": ["CNN scoring", "CNN 스코어링"],
+  "dock.poseSort": ["Sort poses by", "포즈 정렬 기준"],
+  "dock.noGpu": ["CPU only (no GPU)", "CPU만 사용 (GPU 안 씀)"],
+  "dock.col.cnn": ["CNN score", "CNN 점수"],
+  "dock.col.cnnAff": ["CNN aff.", "CNN 친화도"],
   "dock.receptor": ["Receptor", "수용체"],
   "dock.noReceptor": ["No protein loaded in the Viewer", "뷰어에 불러온 단백질이 없습니다"],
   "dock.noWater": ["Remove water", "물 분자 제거"],
@@ -224,7 +233,7 @@ const STRINGS = {
   "dock.col.lb": ["RMSD l.b.", "RMSD 하한"],
   "dock.col.ub": ["u.b.", "상한"],
   "dock.col.ref": ["vs crystal", "결정 구조 대비"],
-  "dock.col.refTitle": ["Heavy-atom RMSD to the ligand in the structure, matched by atom name (Å)", "구조 속 리간드와의 비수소 원자 RMSD, 원자 이름으로 대응 (Å)"],
+  "dock.col.refTitle": ["Heavy-atom RMSD to the ligand in the structure; each atom is paired with the nearest atom of the same element (Å)", "구조 속 리간드와의 비수소 원자 RMSD, 같은 원소의 가장 가까운 원자끼리 대응 (Å)"],
   "dock.showAll": ["Show all poses", "모든 포즈 표시"],
   "dock.send": ["Send to Viewer", "뷰어로 보내기"],
   "dock.sent": ["Sent to the Viewer", "뷰어로 보냈습니다"],
@@ -250,6 +259,7 @@ function initialLang(): Lang {
 }
 
 export let lang: Lang = initialLang();
+document.documentElement.lang = lang;
 
 export function t(key: Key, vars: Record<string, string | number> = {}) {
   const s = STRINGS[key][lang === "ko" ? 1 : 0];
@@ -259,16 +269,17 @@ export function t(key: Key, vars: Record<string, string | number> = {}) {
 export function setLang(l: Lang) {
   lang = l;
   try { localStorage.setItem("pymol-web-lang", l); } catch { /* storage unavailable */ }
-  applyStatic();
+  document.documentElement.lang = l;
   window.dispatchEvent(new Event("langchange"));
 }
 
-/** Translate the static markup. */
-export function applyStatic(root: ParentNode = document) {
-  document.documentElement.lang = lang;
-  root.querySelectorAll<HTMLElement>("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n as Key); });
-  root.querySelectorAll<HTMLElement>("[data-i18n-title]").forEach((el) => { el.title = t(el.dataset.i18nTitle as Key); });
-  root.querySelectorAll<HTMLInputElement>("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder as Key); });
+/** Subscribe a component to language changes; returns t. */
+export function useT() {
+  useSyncExternalStore(
+    (cb) => { window.addEventListener("langchange", cb); return () => window.removeEventListener("langchange", cb); },
+    () => lang,
+  );
+  return t;
 }
 
 /** Command errors are English; translate the ones UI actions can produce. */
