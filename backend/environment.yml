@@ -1,0 +1,13 @@
+# Backend Python environment. `npm run setup` creates it at backend/.env
+# (conda create -p backend/.env --override-channels -c conda-forge <dependencies below>) and re-applies it when this file changes.
+# Versions are the tested ones; "=X.Y" allows patch releases.
+name: pymol-web-backend
+channels:
+  - conda-forge
+  - nodefaults        # conda-forge only (avoids the Anaconda defaults channels and their ToS prompt)
+dependencies:
+  - python=3.12
+  - openbabel=3.2      # obabel: receptor/ligand -> PDBQT, SMILES -> 3D
+  - fastapi=0.142
+  - uvicorn=0.54
+  - pydantic=2.13

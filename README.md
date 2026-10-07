@@ -40,10 +40,31 @@ npm run setup
 `npm run setup` installs everything inside the project folder and is safe to re-run. It does three things:
 
 1. Installs the frontend packages (`npm ci` in `frontend/`).
-2. Creates the Python env `backend/.env` from conda-forge: Python 3.12, Open Babel, FastAPI, uvicorn and pydantic. This takes a few minutes the first time.
-3. Downloads AutoDock Vina 1.2.7 from the [official releases](https://github.com/ccsb-scripps/AutoDock-Vina/releases) to `tools/vina/`. conda-forge has no Windows build of Vina.
+2. Creates the Python env `backend/.env` from `backend/environment.yml`, using conda-forge only. This takes a few minutes the first time.
+3. Downloads AutoDock Vina from the [official releases](https://github.com/ccsb-scripps/AutoDock-Vina/releases) to `tools/vina/`, using the version in `backend/tools.json`.
 
-It finishes by printing the Vina and Open Babel versions. To use binaries you already have, set `VINA_BIN` and/or `OBABEL_BIN`. Tools are looked up in this order: environment variable, project-local path, then `PATH`.
+It finishes by printing the Vina and Open Babel versions.
+
+On Windows, keep the project in a short path such as `C:\Users\you\pymol-web`. A few conda-forge packages contain deeply nested files, and a deep folder can exceed Windows' 260-character path limit, which makes conda fail with "No such file or directory". Enabling Windows long paths also fixes it.
+
+### Backend requirements
+
+Everything the backend needs is declared in the repo. Nothing is installed globally.
+
+| What | Version | Where it is declared | Installed to |
+|------|---------|----------------------|--------------|
+| Python | 3.12 | `backend/environment.yml` | `backend/.env` |
+| Open Babel (`obabel`) | 3.2 | `backend/environment.yml` | `backend/.env` (`Library/bin/obabel.exe` on Windows, `bin/obabel` elsewhere) |
+| FastAPI, uvicorn, pydantic | 0.142 / 0.54 / 2.13 | `backend/environment.yml` | `backend/.env` |
+| AutoDock Vina | 1.2.7 | `backend/tools.json` (version and per-platform release assets) | `tools/vina/vina(.exe)` |
+
+- **Changing a version:** edit `environment.yml` or `tools.json` and re-run `npm run setup`.
+  - Setup keeps a hash of `environment.yml` in `backend/.env/.environment.sha1` and re-applies the file when it changes.
+  - It downloads Vina again if `vina --version` doesn't match `tools.json`.
+  - To start the env from scratch, delete `backend/.env`.
+- **conda channels:** packages come from **conda-forge only**. Setup installs with `--override-channels -c conda-forge`, so it never touches Anaconda's default channels or their terms-of-service prompt. Vina isn't installed through conda because conda-forge has no Windows build.
+- **Without conda:** `backend/requirements.txt` has the pip equivalents. Install Open Babel and Vina yourself and point the backend at them with `OBABEL_BIN` and `VINA_BIN`. Tools are looked up in this order: environment variable, project-local path, then `PATH`.
+- **Checking what the backend found:** `GET /api/dock/status` (also shown on the Docking page) reports the Vina and Open Babel versions in use, or `null` for a missing tool.
 
 The Viewer page works without the backend. Only the Docking page needs it.
 

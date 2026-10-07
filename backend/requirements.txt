@@ -1,5 +1,6 @@
-# Installed into backend/.env by `npm run setup` (conda-forge); listed here for reference.
-fastapi
-uvicorn
-pydantic
-# openbabel (conda-forge: provides obabel). AutoDock Vina is downloaded to tools/vina/ by the setup script.
+# pip equivalent of environment.yml, for setups without conda.
+# Open Babel is not pip-installable reliably: install it separately and set OBABEL_BIN.
+# AutoDock Vina is a standalone binary (see tools.json); set VINA_BIN if it is not in tools/vina/.
+fastapi==0.142.*
+uvicorn==0.54.*
+pydantic==2.13.*
