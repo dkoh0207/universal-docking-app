@@ -1,4 +1,4 @@
-"""Locate and probe the external command-line tools (AutoDock Vina, Open Babel)."""
+"""Locate and probe the external command-line tools (docking engines live in engines.py; Open Babel here)."""
 
 import os
 import shutil
@@ -20,10 +20,6 @@ def _find(env: str, local: list[Path], name: str) -> str | None:
         if p.is_file():
             return str(p)
     return shutil.which(name)
-
-
-def vina_bin() -> str | None:
-    return _find("VINA_BIN", [ROOT / "tools" / "vina" / f"vina{EXE}"], "vina")
 
 
 def obabel_bin() -> str | None:
@@ -57,6 +53,8 @@ def _probe(binary: str, flag: str) -> str | None:
     return out[0].strip() if out else None
 
 
-def versions() -> dict[str, str | None]:
-    v, o = vina_bin(), obabel_bin()
-    return {"vina": _probe(v, "--version") if v else None, "obabel": _probe(o, "-V") if o else None}
+def versions() -> dict:
+    from . import engines  # engines imports this module
+
+    o = obabel_bin()
+    return {"engines": engines.versions(), "obabel": _probe(o, "-V") if o else None}

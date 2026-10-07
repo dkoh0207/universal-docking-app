@@ -162,10 +162,10 @@ export class DockPanel {
   private async checkBackend() {
     const before = this.backend;
     try {
-      const s = await api<{ vina: string | null; obabel: string | null }>("/dock/status");
+      const s = await api<{ engines: { vina: string | null }; obabel: string | null }>("/dock/status");
       const ver = (x: string | null) => x?.match(/\d+\.\d+(\.\d+)?/)?.[0] ?? "";
-      this.versions = { vina: ver(s.vina), obabel: ver(s.obabel) };
-      this.missing = [s.vina ? "" : "Vina", s.obabel ? "" : "Open Babel"].filter(Boolean);
+      this.versions = { vina: ver(s.engines.vina), obabel: ver(s.obabel) };
+      this.missing = [s.engines.vina ? "" : "Vina", s.obabel ? "" : "Open Babel"].filter(Boolean);
       this.backend = this.missing.length ? "missing" : "ok";
     } catch {
       this.backend = "offline";

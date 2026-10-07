@@ -1,4 +1,4 @@
-"""AutoDock Vina docking: receptor/ligand preparation with Open Babel, then Vina."""
+"""Docking (Vina / smina / GNINA): receptor/ligand preparation with Open Babel, then the chosen engine."""
 
 import asyncio
 import re
@@ -6,16 +6,16 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from .. import tools
+from .. import engines, tools
 from ..jobs import Job, manager, sse
 
 router = APIRouter(prefix="/dock", tags=["dock"])
 
 Vec3 = Annotated[list[float], Field(min_length=3, max_length=3)]
 PH = "7.4"
-BAR_STARS = 51  # Vina's progress bar is 51 asterisks wide
+BAR_STARS = 51  # the progress bar of Vina, smina and GNINA is progress bar is 51 asterisks wide
 
 
 class Ligand(BaseModel):
@@ -33,7 +33,20 @@ class DockRequest(BaseModel):
     energy_range: float = Field(3, gt=0, le=20)
     seed: int | None = None
     cpu: int | None = Field(None, ge=1)
-    scoring: Literal["vina", "vinardo"] = "vina"
+    engine: Literal["vina", "smina", "gnina"] = "vina"
+    scoring: str | None = None  # default: the engine's first scoring function
+    cnn_scoring: Literal[engines.CNN_SCORING] = "rescore"  # GNINA only
+    pose_sort: Literal[engines.POSE_SORT] = "CNNscore"  # GNINA only
+    no_gpu: bool = False  # GNINA only
+
+    @model_validator(mode="after")
+    def _check_scoring(self):
+        allowed = engines.ENGINES[self.engine].scoring
+        if self.scoring is None:
+            self.scoring = allowed[0]
+        elif self.scoring not in allowed:
+            raise ValueError(f"scoring must be one of {', '.join(allowed)} for {self.engine}")
+        return self
 
 
 @router.get("/status")
@@ -44,7 +57,7 @@ def status():
 @router.post("/jobs")
 async def create_job(req: DockRequest):
     v = tools.versions()
-    missing = [k for k, ok in v.items() if not ok]
+    missing = [k for k, ok in {req.engine: v["engines"][req.engine], "obabel": v["obabel"]}.items() if not ok]
     if missing:
         raise HTTPException(503, f"Missing tool(s): {', '.join(missing)}. Run `npm run setup`.")
     if any(not (1 <= s <= 126) for s in req.size):
@@ -94,7 +107,8 @@ async def cancel_job(job_id: str):
 
 # ---------------------------------------------------------------- pipeline
 async def run_dock(job: Job, req: DockRequest):
-    vina, obabel = tools.vina_bin(), tools.obabel_bin()
+    engine = engines.ENGINES[req.engine]
+    binary, obabel = engine.binary(), tools.obabel_bin()
     ob_env = tools.tool_env(obabel)
     d = job.dir
 
@@ -124,15 +138,7 @@ async def run_dock(job: Job, req: DockRequest):
     await prep([lig_in, *(["--gen3D"] if fmt == "smiles" else []), "-p", PH, "-O", "ligand.pdbqt"], "ligand.pdbqt", "ligand")
 
     await job.emit("stage", {"stage": "docking"})
-    args = [vina, "--receptor", "receptor.pdbqt", "--ligand", "ligand.pdbqt"]
-    for axis, c, s in zip("xyz", req.center, req.size):
-        args += [f"--center_{axis}", str(c), f"--size_{axis}", str(s)]
-    args += ["--exhaustiveness", str(req.exhaustiveness), "--num_modes", str(req.num_modes),
-             "--energy_range", str(req.energy_range), "--scoring", req.scoring, "--out", "out.pdbqt"]
-    if req.seed is not None:
-        args += ["--seed", str(req.seed)]
-    if req.cpu:
-        args += ["--cpu", str(req.cpu)]
+    args = engines.build_args(engine, binary, req)
 
     stars = 0
 
@@ -144,15 +150,13 @@ async def run_dock(job: Job, req: DockRequest):
             await job.emit("progress", {"value": round(100 * stars / BAR_STARS)})
         await log(text)
 
-    code, output = await job.run(args, tools.tool_env(vina), on_output)
+    code, output = await job.run(args, tools.tool_env(binary), on_output)
     out = d / "out.pdbqt"
     if code != 0 or not out.is_file():
         lines = [l.strip() for l in output.splitlines() if l.strip()]
         first = next((i for i, l in enumerate(lines) if re.search(r"error|invalid|cannot|unsupported", l, re.I)), max(len(lines) - 2, 0))
-        raise RuntimeError(f"Vina failed (exit {code}): {' '.join(lines[first:first + 2])[:300]}")
+        raise RuntimeError(f"{engine.label} failed (exit {code}): {' '.join(lines[first:first + 2])[:300]}")
     poses = out.read_text()
-    modes = []
-    for m in re.finditer(r"^REMARK VINA RESULT:\s+(-?[\d.]+)\s+([\d.]+)\s+([\d.]+)", poses, re.M):
-        modes.append({"mode": len(modes) + 1, "affinity": float(m[1]), "rmsd_lb": float(m[2]), "rmsd_ub": float(m[3])})
+    modes = engines.parse_modes(poses, output)
     await job.emit("progress", {"value": 100})
     await job.emit("done", {"poses": poses, "modes": modes})
