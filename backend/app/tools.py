@@ -33,6 +33,8 @@ def tool_env(binary: str) -> dict[str, str]:
     env = dict(os.environ)
     here = Path(binary).resolve().parent
     env["PATH"] = str(here) + os.pathsep + env.get("PATH", "")
+    if Path(binary).name.startswith("gnina"):  # cuDNN / cuBLAS installed into backend/.env by `setup --gnina`
+        env["LD_LIBRARY_PATH"] = str(ROOT / "backend" / ".env" / "lib") + os.pathsep + env.get("LD_LIBRARY_PATH", "")
     if Path(binary).name.startswith("obabel") and "BABEL_DATADIR" not in env:
         for prefix in (here.parent.parent, here.parent):
             for data in (prefix / "share" / "openbabel", prefix / "Library" / "share" / "openbabel"):

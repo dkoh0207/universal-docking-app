@@ -12,7 +12,7 @@ const vite = join(root, "frontend", "node_modules", "vite", "bin", "vite.js");
 
 const procs = [];
 function start(label, color, cmd, args, opts) {
-  const p = spawn(cmd, args, { ...opts, env: { ...process.env, BACKEND_PORT: port }, stdio: ["ignore", "pipe", "pipe"], });
+  const p = spawn(cmd, args, { ...opts, env: { ...process.env, PATH: [join(root, "backend", ".env", win ? "Library/bin" : "bin"), process.env.PATH].join(win ? ";" : ":"), BACKEND_PORT: port }, stdio: ["ignore", "pipe", "pipe"], });
   const tag = `\x1b[${color}m[${label}]\x1b[0m `;
   for (const s of [p.stdout, p.stderr]) {
     let buf = "";

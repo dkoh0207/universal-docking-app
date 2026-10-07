@@ -8,6 +8,16 @@
       "linux-arm64": "vina_{version}_linux_aarch64",
       "darwin-x64": "vina_{version}_mac_x86_64",
       "darwin-arm64": "vina_{version}_mac_aarch64"
+    },
+    "optional": false
+  },
+  "gnina": {
+    "version": "1.3.3",
+    "optional": true,
+    "note": "CUDA 12.8 static build (~2 GB, needs an NVIDIA driver; `--no_gpu` runs on CPU)",
+    "url": "https://github.com/gnina/gnina/releases/download/v{version}/{asset}",
+    "assets": {
+      "linux-x64": "gnina.cuda12.8.static"
     }
   }
 }

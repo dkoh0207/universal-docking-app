@@ -1,10 +1,12 @@
 // Idempotent project-local setup: frontend deps, the Python env in backend/.env (backend/environment.yml)
-// and AutoDock Vina in tools/vina (backend/tools.json).
+// and the downloaded docking engines in tools/ (Vina; optionally GNINA; backend/tools.json).
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -15,11 +17,12 @@ const run = (cmd, args, opts = {}) => {
 };
 const out = (cmd, args) => spawnSync(cmd, args, { encoding: "utf8" }).stdout?.trim() ?? "";
 
-// ---- frontend dependencies
-if (!existsSync(join(root, "frontend", "node_modules"))) {
-  console.log("==> Installing frontend dependencies");
-  run("npm --prefix frontend ci", [], { shell: true });
-} else console.log("==> Frontend dependencies: ok");
+const findConda = () => {
+  const candidates = [process.env.CONDA_EXE, join(homedir(), "miniconda3", "Scripts", "conda.exe"), join(homedir(), "miniconda3", "bin", "conda"),
+    join(homedir(), "miniforge3", "bin", "conda"), join(homedir(), "anaconda3", "Scripts", "conda.exe"), join(homedir(), "anaconda3", "bin", "conda"),
+    out(win ? "where" : "which", ["conda"]).split(/\r?\n/)[0], out(win ? "where" : "which", ["mamba"]).split(/\r?\n/)[0]];
+  return candidates.find((c) => c && existsSync(c));
+};
 
 // ---- Python environment (spec: backend/environment.yml; re-applied whenever that file changes)
 const envDir = join(root, "backend", ".env");
@@ -29,9 +32,7 @@ const obabel = win ? join(envDir, "Library", "bin", "obabel.exe") : join(envDir,
 const specHash = createHash("sha1").update(readFileSync(envSpec)).digest("hex");
 const haveEnv = existsSync(obabel);
 if (!haveEnv || !existsSync(envStamp) || readFileSync(envStamp, "utf8").trim() !== specHash) {
-  const candidates = [process.env.CONDA_EXE, join(homedir(), "miniconda3", "Scripts", "conda.exe"), join(homedir(), "miniconda3", "bin", "conda"),
-    join(homedir(), "anaconda3", "Scripts", "conda.exe"), join(homedir(), "anaconda3", "bin", "conda"), out(win ? "where" : "which", ["conda"]).split(/\r?\n/)[0], out(win ? "where" : "which", ["mamba"]).split(/\r?\n/)[0]];
-  const conda = candidates.find((c) => c && existsSync(c));
+  const conda = findConda();
   if (!conda) { console.error("conda not found. Install Miniconda (https://docs.conda.io/en/latest/miniconda.html) and re-run `npm run setup`."); process.exit(1); }
   // the package list comes from environment.yml, but is installed with --override-channels so only conda-forge is
   // used (`conda env create` would also pull in Anaconda's default channels, which need a ToS acceptance)
@@ -45,21 +46,50 @@ if (!haveEnv || !existsSync(envStamp) || readFileSync(envStamp, "utf8").trim() !
   writeFileSync(envStamp, specHash);
 } else console.log("==> Python environment: ok");
 
-// ---- AutoDock Vina: official release binary (conda-forge has no Windows build); version and assets in backend/tools.json
-const vinaSpec = JSON.parse(readFileSync(join(root, "backend", "tools.json"), "utf8")).vina;
-const vinaDir = join(root, "tools", "vina");
-const vina = join(vinaDir, win ? "vina.exe" : "vina");
-if (!existsSync(vina) || !out(vina, ["--version"]).includes(`v${vinaSpec.version}`)) {
-  const fill = (str) => str.replaceAll("{version}", vinaSpec.version);
-  const assetTpl = vinaSpec.assets[`${process.platform}-${process.arch}`];
-  if (!assetTpl) { console.error("No Vina release for this platform; install vina and set VINA_BIN."); process.exit(1); }
-  const asset = fill(assetTpl);
-  console.log(`==> Downloading AutoDock Vina ${vinaSpec.version} (${asset})`);
-  const res = await fetch(fill(vinaSpec.url).replace("{asset}", asset));
-  if (!res.ok) { console.error(`Download failed: HTTP ${res.status}`); process.exit(1); }
-  mkdirSync(vinaDir, { recursive: true });
-  writeFileSync(vina, Buffer.from(await res.arrayBuffer()), { mode: 0o755 });
-} else console.log("==> AutoDock Vina: ok");
+// ---- frontend dependencies (npm comes from the conda env: Node is part of environment.yml)
+const envBin = win ? join(envDir, "Library", "bin") : join(envDir, "bin");
+const envPath = { ...process.env, PATH: [envBin, win ? envDir : "", process.env.PATH].filter(Boolean).join(win ? ";" : ":") };
+if (!existsSync(join(root, "frontend", "node_modules"))) {
+  console.log("==> Installing frontend dependencies");
+  run("npm --prefix frontend ci", [], { shell: true, env: envPath });
+} else console.log("==> Frontend dependencies: ok");
 
-console.log("\n" + out(vina, ["--version"]) + "\n" + out(obabel, ["-V"]));
+// ---- downloaded docking engines (backend/tools.json). smina comes from conda (environment.yml). Optional ones, such as
+// GNINA (~2 GB), are installed only with `npm run setup -- --gnina` (or `--all`).
+const toolSpecs = JSON.parse(readFileSync(join(root, "backend", "tools.json"), "utf8"));
+const wanted = (id) => !toolSpecs[id].optional || process.argv.includes(`--${id}`) || process.argv.includes("--all");
+const binPath = {};
+for (const [id, spec] of Object.entries(toolSpecs)) {
+  const bin = join(root, "tools", id, win && id === "vina" ? "vina.exe" : id);
+  binPath[id] = bin;
+  if (!wanted(id)) { console.log(`==> ${id}: skipped (optional, pass --${id})`); continue; }
+  const assetTpl = spec.assets[`${process.platform}-${process.arch}`];
+  if (!assetTpl) {
+    if (spec.optional) { console.log(`==> ${id}: not available for ${process.platform}-${process.arch}, skipped`); continue; }
+    console.error(`No ${id} release for this platform; install it and set ${id.toUpperCase()}_BIN.`); process.exit(1);
+  }
+  if (id === "gnina") {
+    // GNINA's static build still loads cuDNN 9 dynamically: take it from conda-forge into the same env (libcublas etc. come with it)
+    const conda = findConda();
+    if (!conda) { console.error("conda not found (needed for cuDNN)."); process.exit(1); }
+    if (!existsSync(join(envDir, "lib", "libcudnn.so.9"))) {
+      console.log("==> Installing cuDNN into backend/.env (for GNINA)");
+      run(conda, ["install", "-p", envDir, "--override-channels", "-c", "conda-forge", "cudnn=9", "cuda-version=12.8", "-y"]);
+    }
+  }
+  const marker = join(root, "tools", id, ".version");
+  if (existsSync(bin) && existsSync(marker) && readFileSync(marker, "utf8").trim() === spec.version) { console.log(`==> ${id}: ok`); continue; }
+  const fill = (str) => str.replaceAll("{version}", spec.version);
+  const asset = fill(assetTpl);
+  console.log(`==> Downloading ${id} ${spec.version} (${asset})${spec.note ? ` - ${spec.note}` : ""}`);
+  const res = await fetch(fill(spec.url).replace("{asset}", asset));
+  if (!res.ok) { console.error(`Download failed: HTTP ${res.status}`); process.exit(1); }
+  mkdirSync(dirname(bin), { recursive: true });
+  await pipeline(Readable.fromWeb(res.body), createWriteStream(bin, { mode: 0o755 }));
+  writeFileSync(marker, spec.version);
+}
+const smina = join(envDir, win ? "Library/bin/smina.exe" : "bin/smina");
+
+process.env.LD_LIBRARY_PATH = `${join(envDir, "lib")}:${process.env.LD_LIBRARY_PATH ?? ""}`;
+for (const bin of [binPath.vina, smina, binPath.gnina, obabel]) if (existsSync(bin)) console.log(out(bin, [bin === obabel ? "-V" : "--version"]).split("\n")[0]);
 console.log("\nSetup complete. Start everything with `npm run dev`.");

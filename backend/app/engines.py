@@ -54,8 +54,9 @@ def build_args(engine: Engine, binary: str, req: Any) -> list[str]:
     args = [binary, "--receptor", "receptor.pdbqt", "--ligand", "ligand.pdbqt"]
     for axis, c, s in zip("xyz", req.center, req.size):
         args += [f"--center_{axis}", str(c), f"--size_{axis}", str(s)]
-    args += ["--exhaustiveness", str(req.exhaustiveness), "--num_modes", str(req.num_modes),
-             "--energy_range", str(req.energy_range), "--out", "out.pdbqt"]
+    args += ["--exhaustiveness", str(req.exhaustiveness), "--num_modes", str(req.num_modes), "--out", "out.pdbqt"]
+    if engine.id != "gnina":  # GNINA has no --energy_range
+        args += ["--energy_range", str(req.energy_range)]
     if not (engine.id == "gnina" and req.scoring == "default"):
         args += ["--scoring", req.scoring]
     if req.seed is not None:
