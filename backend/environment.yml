@@ -12,4 +12,3 @@ dependencies:
   - fastapi=0.142
   - uvicorn=0.54
   - pydantic=2.13
-  - nodejs=22          # npm and Vite for the frontend, so everything runs from this one env

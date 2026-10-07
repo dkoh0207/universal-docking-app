@@ -9,6 +9,7 @@ const win = process.platform === "win32";
 const port = process.env.BACKEND_PORT || "8787";
 const python = join(root, "backend", ".env", win ? "python.exe" : "bin/python");
 const vite = join(root, "frontend", "node_modules", "vite", "bin", "vite.js");
+const envNode = join(root, "frontend", ".env", win ? "node.exe" : "bin/node"); // Vite 8 needs Node 22.12+ (frontend/environment.yml)
 
 const procs = [];
 function start(label, color, cmd, args, opts) {
@@ -46,5 +47,5 @@ if (existsSync(python)) {
 } else {
   console.log("\x1b[33m[dev]\x1b[0m backend/.env not found - starting the frontend only. Run `npm run setup` to enable docking.");
 }
-if (existsSync(vite)) start("web", "36", process.execPath, [vite], { cwd: join(root, "frontend") });
+if (existsSync(vite)) start("web", "36", existsSync(envNode) ? envNode : process.execPath, [vite], { cwd: join(root, "frontend") });
 else { console.log("[31m[dev][0m frontend dependencies missing - run `npm run setup`."); stop(1); }

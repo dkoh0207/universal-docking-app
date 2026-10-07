@@ -21,8 +21,8 @@ HOST=127.0.0.1
 IS_WIN=0
 case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) IS_WIN=1 ;; esac
 if [ $IS_WIN = 1 ]; then PY="$ROOT/backend/.env/python.exe"; else PY="$ROOT/backend/.env/bin/python"; fi
-# Node, npm and the engines come from the conda env first, so nothing system-wide is required
-if [ $IS_WIN = 1 ]; then export PATH="$ROOT/backend/.env:$ROOT/backend/.env/Library/bin:$PATH"; else export PATH="$ROOT/backend/.env/bin:$PATH"; fi
+# Node and npm come from frontend/.env, the engines from backend/.env, so nothing system-wide is required
+if [ $IS_WIN = 1 ]; then export PATH="$ROOT/frontend/.env:$ROOT/backend/.env:$ROOT/backend/.env/Library/bin:$PATH"; else export PATH="$ROOT/frontend/.env/bin:$ROOT/backend/.env/bin:$PATH"; fi
 VITE="$ROOT/frontend/node_modules/vite/bin/vite.js"
 
 say() { printf '%s\n' "$*"; }

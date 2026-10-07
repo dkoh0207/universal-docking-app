@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "setup": "node scripts/setup.mjs",
-    "build": "npm --prefix frontend run build",
+    "build": "node scripts/frontend.mjs build",
+    "lint": "node scripts/frontend.mjs lint",
+    "format": "node scripts/frontend.mjs format",
+    "check": "node scripts/frontend.mjs check",
     "start": "bash server.sh start prod",
     "stop": "bash server.sh stop",
     "status": "bash server.sh status"

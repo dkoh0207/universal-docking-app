@@ -1,4 +1,4 @@
-// Idempotent project-local setup: frontend deps, the Python env in backend/.env (backend/environment.yml)
+// Idempotent project-local setup: frontend deps, the conda envs backend/.env (Python, engines) and frontend/.env (Node)
 // and the downloaded docking engines in tools/ (Vina; optionally GNINA; backend/tools.json).
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -24,31 +24,34 @@ const findConda = () => {
   return candidates.find((c) => c && existsSync(c));
 };
 
-// ---- Python environment (spec: backend/environment.yml; re-applied whenever that file changes)
-const envDir = join(root, "backend", ".env");
-const envSpec = join(root, "backend", "environment.yml");
-const envStamp = join(envDir, ".environment.sha1");
-const obabel = win ? join(envDir, "Library", "bin", "obabel.exe") : join(envDir, "bin", "obabel");
-const specHash = createHash("sha1").update(readFileSync(envSpec)).digest("hex");
-const haveEnv = existsSync(obabel);
-if (!haveEnv || !existsSync(envStamp) || readFileSync(envStamp, "utf8").trim() !== specHash) {
+// ---- conda environments. Specs live in backend/environment.yml (Python, Open Babel, smina) and
+// frontend/environment.yml (Node); each is re-applied whenever its file changes.
+const envBinDir = (dir) => (win ? join(dir, "Library", "bin") : join(dir, "bin"));
+function ensureEnv({ dir, spec, probe, label }) {
+  const stamp = join(dir, ".environment.sha1");
+  const hash = createHash("sha1").update(readFileSync(spec)).digest("hex");
+  const have = existsSync(probe);
+  if (have && existsSync(stamp) && readFileSync(stamp, "utf8").trim() === hash) { console.log(`==> ${label} environment: ok`); return; }
   const conda = findConda();
   if (!conda) { console.error("conda not found. Install Miniconda (https://docs.conda.io/en/latest/miniconda.html) and re-run `npm run setup`."); process.exit(1); }
-  // the package list comes from environment.yml, but is installed with --override-channels so only conda-forge is
+  // the package list comes from the yml, but is installed with --override-channels so only conda-forge is
   // used (`conda env create` would also pull in Anaconda's default channels, which need a ToS acceptance)
   // some conda-forge packages (e.g. typer) contain ~150-character paths, past Windows' 260-character limit in a deep folder
-  if (win && envDir.length > 100) console.warn(`!! The project path is long (${envDir.length} chars). If conda fails with "No such file or directory", move the project to a shorter path or enable Windows long paths.`);
-  const yml = readFileSync(envSpec, "utf8");
+  if (win && dir.length > 100) console.warn(`!! The project path is long (${dir.length} chars). If conda fails with "No such file or directory", move the project to a shorter path or enable Windows long paths.`);
+  const yml = readFileSync(spec, "utf8");
   const specs = [...yml.slice(yml.indexOf("dependencies:")).matchAll(/^\s+-\s+([^\s#]+)/gm)].map((m) => m[1]);
-  const channels = ["--override-channels", "-c", "conda-forge"];
-  console.log(`==> ${haveEnv ? "Updating" : "Creating"} the Python environment from backend/environment.yml: ${specs.join(" ")}`);
-  run(conda, [haveEnv ? "install" : "create", "-p", envDir, ...channels, ...specs, "-y"]);
-  writeFileSync(envStamp, specHash);
-} else console.log("==> Python environment: ok");
+  console.log(`==> ${have ? "Updating" : "Creating"} the ${label} environment from ${spec.slice(root.length + 1)}: ${specs.join(" ")}`);
+  run(conda, [have ? "install" : "create", "-p", dir, "--override-channels", "-c", "conda-forge", ...specs, "-y"]);
+  writeFileSync(stamp, hash);
+}
 
-// ---- frontend dependencies (npm comes from the conda env: Node is part of environment.yml)
-const envBin = win ? join(envDir, "Library", "bin") : join(envDir, "bin");
-const envPath = { ...process.env, PATH: [envBin, win ? envDir : "", process.env.PATH].filter(Boolean).join(win ? ";" : ":") };
+const envDir = join(root, "backend", ".env");
+ensureEnv({ dir: envDir, spec: join(root, "backend", "environment.yml"), label: "Python", probe: win ? join(envDir, "Library", "bin", "obabel.exe") : join(envDir, "bin", "obabel") });
+const nodeDir = join(root, "frontend", ".env");
+ensureEnv({ dir: nodeDir, spec: join(root, "frontend", "environment.yml"), label: "Node", probe: win ? join(nodeDir, "node.exe") : join(nodeDir, "bin", "node") });
+
+// ---- frontend dependencies (npm comes from the Node env)
+const envPath = { ...process.env, PATH: [envBinDir(nodeDir), win ? nodeDir : "", process.env.PATH].filter(Boolean).join(win ? ";" : ":") };
 if (!existsSync(join(root, "frontend", "node_modules"))) {
   console.log("==> Installing frontend dependencies");
   run("npm --prefix frontend ci", [], { shell: true, env: envPath });
