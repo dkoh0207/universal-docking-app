@@ -3,6 +3,7 @@ import {
   Anchor, Box, Camera, ChevronDown, Crosshair, Dna, Download, Maximize, MousePointerClick, Network, Pill, Play, RefreshCw,
   RotateCcw, Scan, Send, Server, Settings2, Square, Terminal, Trophy, Upload,
 } from "lucide-react";
+import { fetchFromInput } from "@/actions";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import { SceneHost } from "@/components/scene-host";
 import { SidebarCard } from "@/components/sidebar-card";
 import { ToolButton, ToolSep, toolbarClass } from "@/components/viewer/stage";
 import { dockCtl as ctl, dockHost, dockScene } from "@/core";
-import { backendStatus, poseColor, shortVersion, type Src } from "@/dock/controller";
+import { ADDITIVES, backendStatus, poseColor, shortVersion, type Src } from "@/dock/controller";
 import { CNN_SCORING, ENGINES, ENGINE_IDS, POSE_SORT, type EngineId } from "@/dock/engines";
 import { useScene } from "@/hooks/use-scene";
 import { useT, type Key } from "@/i18n";
@@ -42,7 +43,7 @@ function StatusCard() {
   const s = ctl.store.use();
   const { kind, missing } = backendStatus(s);
   const engine = ENGINES[s.engine];
-  const cmd = missing.length === 1 && missing[0] === "Open Babel" ? "npm run setup" : engine.setup;
+  const cmd = missing.length === 1 && missing[0] === "Open Babel" ? "pnpm run setup" : engine.setup;
   const text = kind === "ok" ? t("dock.status.ok", { engine: engine.label, ver: shortVersion(s.versions[s.engine]), obabel: shortVersion(s.obabel) })
     : kind === "offline" ? t("dock.status.offline")
     : kind === "missing" ? t("dock.status.missing", { tools: missing.join(", "), cmd })
@@ -73,8 +74,13 @@ function StatusCard() {
 function ReceptorCard() {
   const t = useT();
   const s = ctl.store.use();
+  const [id, setId] = useState("");
   return (
     <SidebarCard icon={Dna} title={t("dock.receptor")}>
+      <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); if (fetchFromInput(id)) setId(""); }}>
+        <Input value={id} onChange={(e) => setId(e.target.value)} maxLength={4} spellCheck={false} autoComplete="off" placeholder="1IEP" aria-label={t("dock.fetch")} className="bg-secondary uppercase" />
+        <Button type="submit" variant="outline" className="bg-secondary" disabled={id.trim().length !== 4}><Download />{t("dock.fetch")}</Button>
+      </form>
       <Select value={s.receptor} onValueChange={(v) => ctl.setReceptor(v)} disabled={!s.receptors.length}>
         <SelectTrigger className={selectTrigger}><SelectValue placeholder={t("dock.noReceptor")} /></SelectTrigger>
         <SelectContent position="popper">{s.receptors.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
@@ -102,9 +108,10 @@ function LigandCard() {
           <div className="flex flex-wrap gap-1.5">
             {!s.receptor && <Placeholder>{t("dock.noReceptor")}</Placeholder>}
             {s.receptor && !s.ligands.length && <Placeholder>{t("dock.noLigands")}</Placeholder>}
-            {s.ligands.map((l) => (
+            {[...s.ligands].sort((a, b) => b.n - a.n).map((l) => (
               <button key={l.key} title={t("dock.heavy", { n: l.n })} onClick={() => ctl.pickLigand(l.key)}
                 className={cn("rounded-full border bg-secondary px-2 py-0.5 text-[11.5px] font-semibold text-ligand hover:border-ligand",
+                  l.key !== s.ligKey && (ADDITIVES.has(l.key.split("|")[3]) || l.n < 6) && "opacity-50",
                   l.key === s.ligKey && "border-ligand bg-ligand text-white hover:text-white")}>{l.label}</button>
             ))}
           </div>

@@ -48,6 +48,9 @@ const POSE_COLORS = ["tv_green", "cyan", "magenta", "tv_yellow", "salmon", "tv_o
 const RECEPTOR_COLOR = "slate";
 const REF_COLOR = "grey60";
 const LOG_LINES = 400;
+const MIN_LIGAND_ATOMS = 6;
+/** Crystallisation / buffer organics that are rarely the ligand of interest. */
+export const ADDITIVES = new Set(["GOL", "EDO", "PEG", "PGE", "PG4", "1PE", "P6G", "DMS", "ACT", "MPD", "TRS", "BME", "FMT", "EPE", "MES", "ACY", "IPA", "CIT", "TAR", "MLI", "DTT"]);
 const ENGINE_KEY = "pymol-web-engine";
 
 export const css = (name: string) => (name === REF_COLOR ? "#999999" : toHex(PYMOL_COLORS[name]));
@@ -76,12 +79,12 @@ export class DockController {
   readonly store = createStore<DockState>({
     backend: "checking", versions: { vina: null, smina: null, gnina: null }, obabel: null,
     engine: savedEngine(), scoring: "", cnnScoring: "rescore", poseSort: "CNNscore", noGpu: false,
-    exh: "8", modes: "9", erange: "3", seed: "", cpu: "",
+    exh: "8", modes: "9", erange: "10", seed: "", cpu: "",
     receptors: [], receptor: "", noWater: true, keepHet: false, recInfo: null,
     src: "structure", ligands: [], ligKey: null, uploadName: "", smiles: "",
     center: ["", "", ""], size: ["20", "20", "20"], padding: 8, boxOn: true,
     running: false, stage: "", progress: 0, log: [],
-    results: null, showAll: false, contactsOn: false, legend: [], why: null,
+    results: null, showAll: true, contactsOn: false, legend: [], why: null,
   });
   private viewer: Scene;
   private dock: Scene;
@@ -93,6 +96,8 @@ export class DockController {
   private job: { id: string; stop: () => void } | null = null;
   private visible = false;
   private autoPicked = false;
+  private pocketOf: PObject | null = null; // object whose ligand was auto-picked
+  private protObjs: PObject[] = []; // protein objects seen at the last sync, to spot a newly loaded structure
   private staleView = false; // the dock view changed while hidden (0x0 canvas): re-frame on show
 
   constructor(private deps: Deps) {
@@ -152,8 +157,11 @@ export class DockController {
   private objs() { return this.viewer.objects; }
 
   private syncReceptorList() {
-    const names = this.objs().filter((o) => o.atoms.some((a) => a.cls === "protein" || a.cls === "nucleic")).map((o) => o.name);
-    const keep = this.recObj && names.includes(this.recObj.name) ? this.recObj.name : (names.at(-1) ?? "");
+    const prot = this.objs().filter((o) => o.atoms.some((a) => a.cls === "protein" || a.cls === "nucleic"));
+    const names = prot.map((o) => o.name);
+    const fresh = prot.filter((o) => !this.protObjs.includes(o)).at(-1); // a fetched / loaded structure wins over the current one
+    this.protObjs = prot;
+    const keep = fresh ? fresh.name : this.recObj && names.includes(this.recObj.name) ? this.recObj.name : (names.at(-1) ?? "");
     this.set({ receptors: names });
     this.setReceptor(keep);
   }
@@ -170,6 +178,19 @@ export class DockController {
     }
     this.syncReceptor();
     this.renderLigand();
+    if (obj && obj !== this.pocketOf) { this.pocketOf = obj; this.autoPickLigand(); }
+  }
+
+  /** Select the ligand of interest (largest non-additive organic residue) and fit the search box around it. */
+  private autoPickLigand() {
+    if (this.s.src !== "structure" || this.s.ligKey) return;
+    let best: string | null = null, n = 0;
+    for (const [key, l] of this.ligands()) {
+      if (l.atoms.length >= MIN_LIGAND_ATOMS && !ADDITIVES.has(key.split("|")[3]) && l.atoms.length > n) { best = key; n = l.atoms.length; }
+    }
+    if (!best) { toast(t("dock.noPocket")); return; }
+    this.pickLigand(best);
+    if (this.visible) this.zoomFocus();
   }
 
   setReceptorOptions(patch: { noWater?: boolean; keepHet?: boolean }) {
@@ -405,7 +426,7 @@ export class DockController {
       this.deps.run(`hide everything, ${name}; show sticks, ${name} and not elem H; color ${POSE_COLORS[i % POSE_COLORS.length]}, ${name} and elem C; color atomic, ${name} and not elem C`);
     });
     this.showPose(0);
-    this.deps.run(`zoom pose_1${this.dock.objects.some((o) => o.name === "ref_ligand") ? " or ref_ligand" : ""}`);
+    this.deps.run(`zoom pose_1${this.dock.objects.some((o) => o.name === "ref_ligand") ? " or ref_ligand" : ""}`); // crystal ligand stays as the overlay
     if (modes.length) toast(t("dock.done", { aff: modes[0].affinity.toFixed(1) }));
   }
 
