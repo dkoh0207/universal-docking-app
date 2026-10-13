@@ -193,6 +193,8 @@ const STRINGS = {
   "dock.src.smiles": ["SMILES", "SMILES"],
   "dock.structureHint": ["Pick a ligand of the receptor structure to re-dock it into its own pocket.", "수용체 구조의 리간드를 골라 같은 포켓에 다시 도킹해 보세요."],
   "dock.noLigands": ["This structure has no ligands", "이 구조에는 리간드가 없습니다"],
+  "dock.noPocket": ["No drug-like ligand found in this structure: pick one, upload a file, or enter a SMILES", "약물 유사 리간드를 찾지 못했습니다. 직접 고르거나 파일/SMILES를 사용하세요"],
+  "dock.fetch": ["Fetch PDB ID", "PDB ID 불러오기"],
   "dock.heavy": ["{n} heavy atoms", "비수소 원자 {n}개"],
   "dock.chooseFile": ["Choose .sdf / .mol2 / .pdb", ".sdf / .mol2 / .pdb 파일 선택"],
   "dock.smilesPlaceholder": ["e.g. CC(=O)Oc1ccccc1C(=O)O", "예: CC(=O)Oc1ccccc1C(=O)O"],

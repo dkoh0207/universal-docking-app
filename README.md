@@ -7,6 +7,9 @@ The UI is available in English and Korean, in light and dark themes (switches at
 
 Built with Vite, 3Dmol.js, Lucide icons and the Pretendard font.
 
+
+> **Agents: use pnpm, never npm/npx.** Run JS commands as `pnpm run <script>`, install with `pnpm add <pkg>`, run binaries with `pnpm exec <bin>` / `pnpm dlx <pkg>`. Do not create or commit `package-lock.json`.
+
 ## Layout
 
 ```
@@ -24,7 +27,7 @@ server.sh   background dev/prod server manager
 | Tool | Version | Notes |
 |------|---------|-------|
 | [Git](https://git-scm.com/) | any | on Windows, Git for Windows also provides **Git Bash**, which `server.sh` needs |
-| [Node.js](https://nodejs.org/) | 20+ (tested on 24) | includes npm |
+| [Node.js](https://nodejs.org/) | 20+ (tested on 24) | Node ships with the conda env; use pnpm (not npm) for all JS commands |
 | [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or Anaconda | any | used to create the backend's Python env; does not need to be on `PATH` (setup also looks in `~/miniconda3` and `~/anaconda3`, or set `CONDA_EXE`) |
 
 Tested on Windows 11. The Linux/macOS code paths exist but have not been tested.
@@ -34,12 +37,12 @@ Tested on Windows 11. The Linux/macOS code paths exist but have not been tested.
 ```bash
 git clone <repo-url> pymol-web
 cd pymol-web
-npm run setup
+pnpm run setup
 ```
 
-`npm run setup` installs everything inside the project folder and is safe to re-run. It does three things:
+`pnpm run setup` installs everything inside the project folder and is safe to re-run. It does three things:
 
-1. Installs the frontend packages (`npm ci` in `frontend/`).
+1. Installs the frontend packages (`pnpm install --frozen-lockfile` in `frontend/`).
 2. Creates the Python env `backend/.env` from `backend/environment.yml`, using conda-forge only. This takes a few minutes the first time.
 3. Downloads AutoDock Vina from the [official releases](https://github.com/ccsb-scripps/AutoDock-Vina/releases) to `tools/vina/`, using the version in `backend/tools.json`.
 
@@ -58,7 +61,7 @@ Everything the backend needs is declared in the repo. Nothing is installed globa
 | FastAPI, uvicorn, pydantic | 0.142 / 0.54 / 2.13 | `backend/environment.yml` | `backend/.env` |
 | AutoDock Vina | 1.2.7 | `backend/tools.json` (version and per-platform release assets) | `tools/vina/vina(.exe)` |
 
-- **Changing a version:** edit `environment.yml` or `tools.json` and re-run `npm run setup`.
+- **Changing a version:** edit `environment.yml` or `tools.json` and re-run `pnpm run setup`.
   - Setup keeps a hash of `environment.yml` in `backend/.env/.environment.sha1` and re-applies the file when it changes.
   - It downloads Vina again if `vina --version` doesn't match `tools.json`.
   - To start the env from scratch, delete `backend/.env`.
@@ -72,16 +75,16 @@ The Viewer page works without the backend. Only the Docking page needs it.
 
 | | Command | Open |
 |---|---|---|
-| **Dev**, foreground (Ctrl+C stops both) | `npm run dev` | http://127.0.0.1:5179 |
+| **Dev**, foreground (Ctrl+C stops both) | `pnpm run dev` | http://127.0.0.1:5179 |
 | **Dev**, background | `./server.sh start dev` | http://127.0.0.1:5179 |
-| **Prod**, background | `./server.sh start prod` (or `npm start`) | http://127.0.0.1:8080 |
-| Status | `./server.sh status` (or `npm run status`) | |
-| Stop | `./server.sh stop` (or `npm stop`) | |
+| **Prod**, background | `./server.sh start prod` (or `pnpm start`) | http://127.0.0.1:8080 |
+| Status | `./server.sh status` (or `pnpm run status`) | |
+| Stop | `./server.sh stop` (or `pnpm stop`) | |
 
-On Windows, run `server.sh` from Git Bash. The `npm` scripts work from any shell as long as `bash` is on `PATH`.
+On Windows, run `server.sh` from Git Bash. The `pnpm` scripts work from any shell as long as `bash` is on `PATH`.
 
 - **Dev** runs Vite with hot reload on :5179 and uvicorn with `--reload` on :8787. Vite forwards `/api` to uvicorn.
-- **Prod** builds `frontend/dist`, then runs one uvicorn process on :8080 that serves the API under `/api` and the built app at `/`. Add `--no-build` to reuse the last build. `npm run build` only type-checks and builds.
+- **Prod** builds `frontend/dist`, then runs one uvicorn process on :8080 that serves the API under `/api` and the built app at `/`. Add `--no-build` to reuse the last build. `pnpm run build` only type-checks and builds.
 
 The backend serves `frontend/dist` when `PYMOL_WEB_STATIC` points to it. The script sets this in prod; dev mode does not. Change ports with `WEB_PORT`, `BACKEND_PORT` and `PROD_PORT`. Port 8000 is deliberately not used because other local tools often take it. Both servers listen on 127.0.0.1 only and have no authentication, so don't expose them to a network as they are.
 
@@ -95,7 +98,7 @@ The backend serves `frontend/dist` when `PYMOL_WEB_STATIC` points to it. The scr
 ./server.sh logs [dev|prod] [-f]
 ```
 
-PIDs are kept in `.run/<mode>-<name>.pid` and logs in `.run/logs/<mode>-<name>.log`. It works in Git Bash on Windows (it uses `taskkill //T //F` to stop whole process trees) and on Linux/macOS. `npm start` / `npm stop` / `npm run status` call it too.
+PIDs are kept in `.run/<mode>-<name>.pid` and logs in `.run/logs/<mode>-<name>.log`. It works in Git Bash on Windows (it uses `taskkill //T //F` to stop whole process trees) and on Linux/macOS. `pnpm start` / `pnpm stop` / `pnpm run status` call it too.
 
 Open `?pdb=4hhb` to load a specific entry at startup. The default is 1HSG.
 
