@@ -16,7 +16,7 @@ LOGS="$RUN/logs"
 WEB_PORT="${WEB_PORT:-5179}"
 BACKEND_PORT="${BACKEND_PORT:-8787}"
 PROD_PORT="${PROD_PORT:-8080}"
-HOST=127.0.0.1
+HOST="${HOST:-127.0.0.1}"
 
 IS_WIN=0
 case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) IS_WIN=1 ;; esac
