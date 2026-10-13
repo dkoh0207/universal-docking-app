@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Activity, Camera, ChevronDown, Cpu, Dna, Flame, Gauge, Maximize, Pause, Pill, Play, RotateCcw, Scan, Settings2, Square, Terminal, Waves } from "lucide-react";
+import { Activity, Camera, ChevronDown, Cpu, Dna, Flame, Gauge, History, Maximize, Pause, Pill, Play, RotateCcw, Scan, Settings2, Square, Terminal, Trash2, Waves } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ export function MdSidebar() {
   return (
     <aside className="flex min-h-0 flex-col gap-2.5 overflow-y-auto pb-1">
       <StatusCard />
+      <RunsCard />
       <ComplexCard />
       <SimCard />
       <SystemCard />
@@ -44,6 +45,29 @@ function StatusCard() {
         <i className={cn("mt-1 size-2 shrink-0 rounded-full", s.backend === "ready" ? "bg-emerald-500" : s.backend === "checking" ? "bg-amber-400" : "bg-destructive")} />
         <span>{text}</span>
       </div>
+    </SidebarCard>
+  );
+}
+
+function RunsCard() {
+  const t = useT();
+  const s = ctl.store.use();
+  const cur = s.runs.find((r) => r.id === s.run);
+  return (
+    <SidebarCard icon={History} title={t("md.runs")}>
+      <Select value={s.run} onValueChange={(v) => ctl.loadRun(v)} disabled={!s.runs.length || s.running}>
+        <SelectTrigger className={selectTrigger}><SelectValue placeholder={t("md.runs.pick")} /></SelectTrigger>
+        <SelectContent position="popper">
+          {s.runs.map((r) => <SelectItem key={r.id} value={r.id}>{r.example ? `★ ${r.name}` : `${r.name} · ${r.created.slice(5, 16).replace("T", " ")}`}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      {cur && (
+        <div className="flex items-center gap-2 text-[11.5px] text-muted-foreground">
+          <span className="flex-1">{t("md.runs.info", { ns: cur.production_ns, frames: cur.frames, ok: cur.checks_ok, n: cur.checks, platform: cur.platform })}</span>
+          {!cur.example && <Button variant="ghost" size="icon-sm" title={t("md.runs.delete")} onClick={() => ctl.deleteRun(cur.id)}><Trash2 /></Button>}
+        </div>
+      )}
+      {!s.runs.length && <Hint>{t("md.runs.none")}</Hint>}
     </SidebarCard>
   );
 }

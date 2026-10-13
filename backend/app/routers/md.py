@@ -1,7 +1,9 @@
 """Molecular dynamics (OpenMM) of a protein-ligand complex, then trajectory analysis (ProLIF, RMSD, ...). See app/md/."""
 
 import asyncio
+import datetime
 import json
+import shutil
 import sys
 import urllib.request
 from pathlib import Path
@@ -17,6 +19,8 @@ from .dock import events_stream
 
 router = APIRouter(prefix="/md", tags=["md"])
 BACKEND = Path(__file__).resolve().parents[2]
+EXAMPLES = BACKEND / "examples" / "md"  # bundled, read-only runs
+RUNS = tools.ROOT / ".run" / "md-runs"  # runs saved after each successful job (gitignored)
 PY = sys.executable
 
 
@@ -25,6 +29,7 @@ class MdRequest(BaseModel):
     ligand_pdb: str = Field(min_length=1)  # the pose, PDB format (all atoms, bond orders not needed)
     smiles: str | None = None  # bond-order template; default: the RCSB chemical component of `ligand_resname`
     ligand_resname: str | None = None
+    label: str = ""  # shown in the past-runs list, e.g. "1IEP · Docked pose 1"
     # simulation
     production_ns: float = Field(0.1, gt=0, le=100)
     report_ps: float = Field(10, ge=0.1, le=1000)  # frame interval (granularity of the trajectory and of the ProLIF history)
@@ -92,6 +97,71 @@ async def cancel_job(job_id: str):
     if not job:
         raise HTTPException(404, "Unknown job")
     return {"cancelled": await job.cancel()}
+
+
+def _run_dirs() -> dict[str, tuple[Path, bool]]:
+    """id -> (directory, is_example) of every stored run."""
+    out: dict[str, tuple[Path, bool]] = {}
+    for base, example in ((EXAMPLES, True), (RUNS, False)):
+        if base.is_dir():
+            for d in base.iterdir():
+                if (d / "run.json").is_file() and (d / "results.json").is_file():
+                    out[("ex-" if example else "run-") + d.name] = (d, example)
+    return out
+
+
+@router.get("/runs")
+def list_runs():
+    """Stored runs (bundled examples and saved runs), newest first."""
+    rows = []
+    for rid, (d, example) in _run_dirs().items():
+        try:
+            rows.append({"id": rid, "example": example, **json.loads((d / "run.json").read_text())})
+        except (OSError, ValueError):
+            continue
+    return sorted(rows, key=lambda r: r.get("created", ""), reverse=True)
+
+
+def _run_file(run_id: str, name: str) -> Path:
+    entry = _run_dirs().get(run_id)
+    if not entry or not (entry[0] / name).is_file():
+        raise HTTPException(404, "Unknown run")
+    return entry[0] / name
+
+
+@router.get("/runs/{run_id}/results")
+def run_results(run_id: str):
+    return Response(_run_file(run_id, "results.json").read_bytes(), media_type="application/json")
+
+
+@router.get("/runs/{run_id}/view.pdb")
+def run_view(run_id: str):
+    return FileResponse(_run_file(run_id, "view.pdb"), media_type="chemical/x-pdb")
+
+
+@router.delete("/runs/{run_id}")
+def delete_run(run_id: str):
+    entry = _run_dirs().get(run_id)
+    if not entry:
+        raise HTTPException(404, "Unknown run")
+    if entry[1]:
+        raise HTTPException(403, "Bundled examples cannot be deleted")
+    shutil.rmtree(entry[0], ignore_errors=True)
+    return {"deleted": True}
+
+
+def save_run(job: Job, req: MdRequest):
+    """Keep the results of a finished job (the job directory is deleted after an hour)."""
+    r = json.loads((job.dir / "results.json").read_text())
+    m = r["meta"]
+    dest = RUNS / job.id
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in ("results.json", "view.pdb"):
+        shutil.copy2(job.dir / f, dest / f)
+    (dest / "run.json").write_text(json.dumps({
+        "name": req.label or "MD run", "created": datetime.datetime.now().isoformat(timespec="seconds"),
+        "production_ns": req.production_ns, "frames": m["frames"], "platform": m["platform"], "atoms": m["atoms"],
+        "checks_ok": sum(c["ok"] for c in r["checks"]), "checks": len(r["checks"])}))
 
 
 @router.get("/jobs/{job_id}/results")
@@ -170,4 +240,5 @@ async def run_md(job: Job, req: MdRequest):
     if code != 0 or not (d / "results.json").is_file():
         tail = [l for l in out.strip().splitlines() if l.strip()][-1:] or ["no output"]
         raise RuntimeError(f"Analysis failed (exit {code}): {tail[0][:300]}")
-    await job.emit("done", {"ok": True})
+    save_run(job, req)
+    await job.emit("done", {"ok": True, "run": "run-" + job.id})

@@ -7,6 +7,9 @@ import { toast } from "../ui/toast";
 import type { Scene } from "../viewer";
 import type { DockController } from "../dock/controller";
 
+export interface RunInfo {
+  id: string; example: boolean; name: string; created: string; production_ns: number; frames: number; platform: string; atoms: number; checks_ok: number; checks: number;
+}
 export interface Check { id: string; ok: boolean; value: number; target: number; unit: string }
 export interface Interaction { res: string; type: string; present: number[]; occupancy: number }
 export interface MdResults {
@@ -33,7 +36,7 @@ export interface MdState extends Settings {
   backend: "checking" | "offline" | "missing" | "ready"; info: { openmm?: string; prolif?: string; platforms?: string[]; error?: string };
   receptor: string; ligand: string; options: { id: string; label: string }[]; smiles: string; resname: string;
   running: boolean; stage: string; progress: number; frames: number; log: string[];
-  results: MdResults | null; frame: number; playing: boolean; focus: string | null; why: string | null;
+  runs: RunInfo[]; run: string; results: MdResults | null; frame: number; playing: boolean; focus: string | null; why: string | null;
 }
 
 const LOG_LINES = 400;
@@ -42,7 +45,7 @@ const num = (v: string, d: number) => (v.trim() !== "" && Number.isFinite(+v) ? 
 export class MdController {
   readonly store = createStore<MdState>({
     ...DEFAULTS, backend: "checking", info: {}, receptor: "", ligand: "", options: [], smiles: "", resname: "",
-    running: false, stage: "", progress: 0, frames: 0, log: [], results: null, frame: 0, playing: false, focus: null, why: null,
+    running: false, stage: "", progress: 0, frames: 0, log: [], runs: [], run: "", results: null, frame: 0, playing: false, focus: null, why: null,
   });
   private job: { id: string; stop: () => void } | null = null;
   private poll = 0;
@@ -65,6 +68,7 @@ export class MdController {
     this.visible = true;
     this.syncInputs();
     this.checkBackend();
+    this.refreshRuns();
     clearInterval(this.poll);
     this.poll = window.setInterval(() => this.checkBackend(), 8000);
     this.scene.resize();
@@ -78,6 +82,28 @@ export class MdController {
     } catch {
       this.set({ backend: "offline", info: {} });
     }
+  }
+
+  // ------------------------------------------------------------- past runs
+  async refreshRuns() {
+    try { this.set({ runs: await api<RunInfo[]>("/md/runs") }); } catch { /* backend offline: the status card says so */ }
+  }
+
+  /** Show a stored run (bundled example or saved run) without simulating again. */
+  async loadRun(id: string) {
+    if (this.s.running || !id) return;
+    this.pause();
+    this.clearScene();
+    this.set({ run: id, results: null, stage: "", frame: 0, focus: null });
+    await this.loadResults(`/md/runs/${id}`);
+  }
+
+  async deleteRun(id: string) {
+    try {
+      await api(`/md/runs/${id}`, { method: "DELETE" });
+      if (this.s.run === id) { this.clearScene(); this.set({ run: "", results: null }); }
+      await this.refreshRuns();
+    } catch (e) { toast((e as Error).message, "err"); }
   }
 
   /** Take the receptor and ligand choices from the Docking page (the shared active structure). */
@@ -105,6 +131,7 @@ export class MdController {
     const s = this.s, inp = this.inputs!, lig = inp.options.find((o) => o.id === s.ligand)!;
     return {
       receptor_pdb: inp.receptorPdb, ligand_pdb: lig.pdb, smiles: s.smiles.trim() || undefined, ligand_resname: s.resname || undefined,
+      label: `${inp.receptor} · ${lig.label}`,
       production_ns: num(s.productionNs, 0.1), report_ps: num(s.reportPs, 10), timestep_fs: num(s.timestepFs, 2), hmr: s.hmr,
       temperature_k: num(s.temperature, 300), pressure_bar: num(s.pressure, 1), friction_ps: num(s.friction, 1), barostat_interval: Math.round(num(s.barostatInterval, 25)),
       padding_nm: num(s.padding, 1), ionic_strength_m: num(s.ionic, 0.15), water_model: s.waterModel, protein_ff: s.proteinFf, ligand_ff: s.ligandFf, ligand_charges: s.charges, cutoff_nm: num(s.cutoff, 1),
@@ -119,7 +146,7 @@ export class MdController {
     const body = this.body();
     this.pause();
     this.clearScene();
-    this.set({ log: [], stage: "", progress: 0, frames: 0, running: true, results: null, frame: 0 });
+    this.set({ log: [], stage: "", progress: 0, frames: 0, running: true, results: null, run: "", frame: 0 });
     this.job = { id: "", stop: () => undefined };
     try {
       const { id } = await api<{ id: string }>("/md/jobs", { json: body });
@@ -131,7 +158,12 @@ export class MdController {
         stage: (d) => this.set({ stage: d.stage, progress: 0 }),
         progress: (d) => this.set({ progress: d.value, ...(d.frames !== undefined ? { frames: d.frames } : {}) }),
         log: (d) => this.set({ log: [...this.s.log, d.text].slice(-LOG_LINES) }),
-        done: () => { finish(); this.set({ stage: "done" }); this.loadResults(id); },
+        done: async (d) => {
+          finish();
+          this.set({ stage: "done", run: d.run ?? "" });
+          this.loadResults(d.run ? `/md/runs/${d.run}` : `/md/jobs/${id}`);
+          this.refreshRuns();
+        },
         error: (d) => { if (d.cancelled) { this.set({ stage: "cancelled" }); finish(); } else fail(d.message); },
       }, () => fail(t("dock.lost")));
     } catch (e) {
@@ -153,10 +185,10 @@ export class MdController {
   }
 
   // ------------------------------------------------------------- results & playback
-  private async loadResults(id: string) {
+  private async loadResults(base: string) {
     try {
-      const results = await api<MdResults>(`/md/jobs/${id}/results`);
-      const text = await (await fetch(`/api/md/jobs/${id}/view.pdb`)).text();
+      const results = await api<MdResults>(`${base}/results`);
+      const text = await (await fetch(`/api${base}/view.pdb`)).text();
       this.frames = text.split(/^ENDMDL.*$/m).map((f) => f.replace(/^MODEL.*$/m, "").trim()).filter((f) => f.includes("ATOM")).map((f) => f + "\nEND\n");
       this.set({ results, frame: 0, focus: null });
       this.draw(true);
