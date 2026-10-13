@@ -3,6 +3,7 @@
 
 import { Interpreter } from "./commands";
 import { DockController } from "./dock/controller";
+import { MdController } from "./md/controller";
 import { translateError } from "./i18n";
 import { fetchEntryInfo, type EntryInfo } from "./rcsb";
 import { createStore } from "./lib/store";
@@ -20,12 +21,15 @@ function makeHost() {
 
 export const sceneHost = makeHost();
 export const dockHost = makeHost();
+export const mdHost = makeHost();
 export const scene = new Scene(sceneHost);
 export const dockScene = new Scene(dockHost);
+export const mdScene = new Scene(mdHost);
 
 const applyBackground = () => {
   scene.setThemeBackground(THEME_BG[getTheme()]);
   dockScene.setThemeBackground(THEME_BG[getTheme()]);
+  mdScene.setThemeBackground(THEME_BG[getTheme()]);
 };
 applyBackground();
 subscribeTheme(applyBackground);
@@ -48,6 +52,8 @@ export const run = (cmd: string) => interp.run(cmd, false);
 // the Docking page has its own scene (and interpreter, so PyMOL commands work there too)
 const dockInterp = new Interpreter(dockScene, { log: logError });
 export const dockRun = (cmd: string) => dockInterp.run(cmd, false);
+const mdInterp = new Interpreter(mdScene, { log: logError });
+export const mdRun = (cmd: string) => mdInterp.run(cmd, false);
 
 // ---------------------------------------------------------------- viewer UI state shared across components
 export type InfoState = EntryInfo | "loading" | "error";
@@ -60,7 +66,7 @@ export const viewerUi = createStore({
   busy: "" as string, // text of the busy indicator, "" when idle
 });
 
-export const appUi = createStore({ page: "viewer" as "viewer" | "dock" });
+export const appUi = createStore({ page: "viewer" as "viewer" | "dock" | "md" });
 
 export function onLoaded(obj: PObject) {
   viewerUi.set({ current: obj });
@@ -83,26 +89,37 @@ scene.addEventListener("objects", () => {
 });
 
 // ---------------------------------------------------------------- pages (Viewer / Docking)
-export type Page = "viewer" | "dock";
+export type Page = "viewer" | "dock" | "md";
 
 export function setPage(p: Page) {
   appUi.set({ page: p });
-  history.replaceState(null, "", p === "dock" ? "#dock" : location.pathname + location.search);
+  history.replaceState(null, "", p === "viewer" ? location.pathname + location.search : `#${p}`);
   try { localStorage.setItem("pymol-web-page", p); } catch { /* storage unavailable */ }
   requestAnimationFrame(() => {
-    if (p === "dock") { dockCtl.show(); dockScene.resize(); } else { dockCtl.hide(); scene.resize(); }
+    if (p === "dock") { dockCtl.show(); dockScene.resize(); } else dockCtl.hide();
+    if (p === "md") mdCtl.show(); else mdCtl.hide();
+    if (p === "viewer") scene.resize();
   });
 }
 
 export function initialPage(): Page {
   if (location.hash === "#dock") return "dock";
+  if (location.hash === "#md") return "md";
   if (location.hash === "#viewer") return "viewer";
-  try { return localStorage.getItem("pymol-web-page") === "dock" ? "dock" : "viewer"; } catch { return "viewer"; }
+  try { const v = localStorage.getItem("pymol-web-page"); return v === "dock" || v === "md" ? v : "viewer"; } catch { return "viewer"; }
 }
 
 export const dockCtl = new DockController({
   viewer: scene, dock: dockScene, run: dockRun,
-  toViewer: (obj) => onLoaded(obj), openViewer: () => setPage("viewer"),
+  toViewer: (obj) => onLoaded(obj), select: (obj) => { if (viewerUi.get().current !== obj) viewerUi.set({ current: obj }); }, openViewer: () => setPage("viewer"),
 });
 
-(window as unknown as { __pymol: unknown }).__pymol = { scene, dockScene, dockCtl }; // debugging / headless tests
+export const mdCtl = new MdController(dockCtl, mdScene, mdRun);
+
+// one active structure: choosing a polymer in the Viewer's object list makes it the Docking receptor too
+viewerUi.subscribe(() => {
+  const cur = viewerUi.get().current;
+  if (cur && cur.name !== dockCtl.store.get().receptor && dockCtl.store.get().receptors.includes(cur.name)) dockCtl.setReceptor(cur.name);
+});
+
+(window as unknown as { __pymol: unknown }).__pymol = { scene, dockScene, dockCtl, mdScene, mdCtl }; // debugging / headless tests

@@ -41,6 +41,7 @@ interface Deps {
   dock: Scene;
   run: (cmd: string) => Promise<boolean>; // PyMOL commands on the dock scene
   toViewer: (obj: PObject) => void;
+  select: (obj: PObject) => void; // make this the shared active structure (the Viewer's current object)
   openViewer: () => void;
 }
 
@@ -169,6 +170,7 @@ export class DockController {
   setReceptor(name: string) {
     const obj = this.objs().find((o) => o.name === name) ?? null;
     this.set({ receptor: name });
+    if (obj) this.deps.select(obj);
     if (obj !== this.recObj) {
       this.recObj = obj;
       this.set({ ligKey: null });
@@ -191,6 +193,20 @@ export class DockController {
     if (!best) { toast(t("dock.noPocket")); return; }
     this.pickLigand(best);
     if (this.visible) this.zoomFocus();
+  }
+
+  /** The complex for an MD run: receptor PDB plus the ligand choices (crystal ligand, each docked pose) as PDB text. */
+  mdInputs() {
+    if (!this.recObj) return null;
+    const crystal = this.s.src === "structure" ? this.ligandAtoms() : [];
+    const options: { id: string; label: string; pdb: string }[] = [];
+    if (crystal.length) options.push({ id: "crystal", label: t("md.crystal"), pdb: toPdb(crystal) });
+    const r = this.s.results;
+    r?.models.forEach((m, i) => options.push({ id: `pose_${i + 1}`, label: t("md.pose", { n: i + 1, aff: r.modes[i]?.affinity.toFixed(1) ?? "?" }), pdb: pdbqtToPdb(m) }));
+    return {
+      receptor: this.recObj.name, receptorPdb: toPdb(this.receptorAtoms()), options,
+      resname: this.s.src === "structure" ? this.s.ligKey?.split("|")[3] ?? "" : "", smiles: this.s.src === "smiles" ? this.s.smiles.trim() : "",
+    };
   }
 
   setReceptorOptions(patch: { noWater?: boolean; keepHet?: boolean }) {

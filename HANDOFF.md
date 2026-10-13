@@ -12,6 +12,12 @@ Work happens in place in `/mnt/c/Users/user/pymol-viewer` (WSL, Ubuntu 24.04, RT
 - Vite polls for changes when the project is under `/mnt/` (inotify does not work on DrvFs).
 - Verified in headless Chromium (Playwright, installed in the session scratchpad, not in the repo): Viewer and Docking render in EN/KO and light/dark without console errors; a UI redock with each engine works (Vina 0.36 Å, GNINA 0.83 Å vs crystal); Cancel kills the engine process.
 
+## MD page (added after the notes above)
+- Third tab "MD" (OpenMM + ProLIF); see the README section. The Viewer's `viewerUi.current` is the shared active structure for the Viewer, Docking and MD pages.
+- Not verified in a real browser (the user asked to skip browser tests): the MD tab UI (heat map, charts, player), and the shared-structure sync. Backend end-to-end test passes (`backend/tests/md_1hsg.py`); `pnpm run build` and eslint pass.
+- Do not edit files under `backend/app` while a job runs: the dev server auto-reloads and drops the job.
+- The env on `/mnt/c` makes cold imports slow (PyTorch ~1 min); `/api/md/status` therefore reads package metadata instead of importing.
+
 ## Not verified / known gaps (do these first)
 1. **`pnpm run check` was NOT run to completion.** The last edits (4 ESLint fixes: literal colors in `viewer/sidebar.tsx` and `viewer/stage.tsx`, regex spaces in `dock/pdb.ts`, an expression statement in `viewer.ts`; `check` script without `format:check`) were applied just before committing. Run `pnpm run check` and fix what remains.
 2. `eslint.config.js` and `.prettierrc.json` exist, but Prettier was never run over the repo (`pnpm run format` would reformat legacy files; do it as its own commit if wanted).

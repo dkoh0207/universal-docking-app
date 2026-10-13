@@ -9,7 +9,7 @@ import "./measure";
 
 createRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);
 
-if (initialPage() === "dock") setPage("dock");
+{ const p = initialPage(); if (p !== "viewer") setPage(p); }
 const fromUrl = new URLSearchParams(location.search).get("pdb");
 loadId(fromUrl && isPdbId(fromUrl) ? fromUrl : "1HSG");
 void viewerUi;
