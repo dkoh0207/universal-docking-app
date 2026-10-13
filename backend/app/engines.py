@@ -1,4 +1,4 @@
-"""Docking engines (AutoDock Vina, smina, GNINA): binary lookup, scoring options, command line and result parsing."""
+"""Docking engines (AutoDock Vina, QuickVina 2, QuickVina-W, smina, GNINA, Uni-Dock): binary lookup, scoring options, command line and result parsing."""
 
 import re
 import sys
@@ -38,6 +38,10 @@ def _local(name: str) -> Callable[[], list[Path]]:
 
 ENGINES: dict[str, Engine] = {
     "vina": Engine("vina", "AutoDock Vina", "VINA_BIN", ("vina", "vinardo"), _local("vina")),
+    # QuickVina 2 / QuickVina-W: Vina 1.1.2 command line (no --scoring, Vina scoring only), faster local search
+    "qvina2": Engine("qvina2", "QuickVina 2", "QVINA2_BIN", ("vina",), _local("qvina2")),
+    "qvinaw": Engine("qvinaw", "QuickVina-W", "QVINAW_BIN", ("vina",), _local("qvinaw")),
+    "unidock": Engine("unidock", "Uni-Dock (GPU)", "UNIDOCK_BIN", ("vina", "vinardo", "ad4"), _local("unidock"), platforms=("linux",)),
     "smina": Engine("smina", "smina", "SMINA_BIN",
                     ("vinardo", "vina", "ad4_scoring", "dkoes_fast", "dkoes_scoring", "dkoes_scoring_old"), _local("smina")),
     "gnina": Engine("gnina", "GNINA", "GNINA_BIN", ("default", "vinardo", "vina", "ad4_scoring", "dkoes_fast", "dkoes_scoring"),
@@ -51,13 +55,20 @@ def versions() -> dict[str, str | None]:
 
 def build_args(engine: Engine, binary: str, req: Any) -> list[str]:
     """Command line for the prepared receptor.pdbqt / ligand.pdbqt in the job directory; output goes to out.pdbqt."""
+    if engine.id == "unidock":  # batch GPU docking: ligands are listed with --ligand_index, poses land in --dir as <name>_out.pdbqt
+        args = [binary, "--receptor", "receptor.pdbqt", "--gpu_batch", "ligand.pdbqt", "--dir", "unidock_out",
+                "--scoring", req.scoring, "--num_modes", str(req.num_modes), "--energy_range", str(req.energy_range),
+                "--search_mode", "balance" if req.exhaustiveness <= 16 else "detail"]
+        for axis, c, s in zip("xyz", req.center, req.size):
+            args += [f"--center_{axis}", str(c), f"--size_{axis}", str(s)]
+        return args + (["--seed", str(req.seed)] if req.seed is not None else [])
     args = [binary, "--receptor", "receptor.pdbqt", "--ligand", "ligand.pdbqt"]
     for axis, c, s in zip("xyz", req.center, req.size):
         args += [f"--center_{axis}", str(c), f"--size_{axis}", str(s)]
     args += ["--exhaustiveness", str(req.exhaustiveness), "--num_modes", str(req.num_modes), "--out", "out.pdbqt"]
     if engine.id != "gnina":  # GNINA has no --energy_range
         args += ["--energy_range", str(req.energy_range)]
-    if not (engine.id == "gnina" and req.scoring == "default"):
+    if engine.id not in ("qvina2", "qvinaw") and not (engine.id == "gnina" and req.scoring == "default"):
         args += ["--scoring", req.scoring]
     if req.seed is not None:
         args += ["--seed", str(req.seed)]

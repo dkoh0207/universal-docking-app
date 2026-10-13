@@ -77,7 +77,7 @@ def analyse(pid: str):
              "LYS": "K", "MET": "M", "PHE": "F", "PRO": "P", "SER": "S", "THR": "T", "TRP": "W", "TYR": "Y", "VAL": "V"}
     res = [r for r in u.select_atoms("protein").residues]
     seq = "".join(three.get(r.resname[:3], "X") for r in res)
-    k = seq.find("EYMANGC")  # hinge Glu475-Tyr476-Met477-Ala478-Asn479-Gly480-Cys481: fixes the numbering of constructs / other species
+    k = seq.find("EYMANG")  # hinge Glu475-Tyr476-Met477-Ala478-Asn479-Gly480-Cys481: fixes the numbering of constructs / other species
     if k < 0:
         raise ValueError("hinge motif EYMANGC not found")
     off = 477 - res[k + 2].resid
