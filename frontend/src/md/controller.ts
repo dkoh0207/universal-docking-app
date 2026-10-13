@@ -191,7 +191,9 @@ export class MdController {
       const text = await (await fetch(`/api${base}/view.pdb`)).text();
       this.frames = text.split(/^ENDMDL.*$/m).map((f) => f.replace(/^MODEL.*$/m, "").trim()).filter((f) => f.includes("ATOM")).map((f) => f + "\nEND\n");
       this.set({ results, frame: 0, focus: null });
-      this.draw(true);
+      await this.draw(true);
+      // the results panel mounts below the viewer and changes its layout: re-measure the canvas, then re-frame the ligand
+      requestAnimationFrame(() => requestAnimationFrame(() => { this.scene.resize(); this.zoomLigand(); }));
     } catch (e) {
       toast((e as Error).message, "err");
     }
@@ -227,10 +229,10 @@ export class MdController {
     this.timer = window.setInterval(() => this.setFrame((this.s.frame + 1) % this.frames.length), 140);
   }
   pause() { clearInterval(this.timer); if (this.s.playing) this.set({ playing: false }); }
-  /** Highlight a residue ("ILE50") of the pocket in the 3D view. */
+  /** Highlight a pocket residue given as "ASP25.A" (residue number and chain). */
   focusResidue(res: string | null) {
-    const num = res?.match(/\d+/)?.[0] ?? null;
-    this.set({ focus: num });
+    const m = res?.match(/(\d+)\.?(\w*)$/);
+    this.set({ focus: m ? `${m[1]}${m[2] ? ` and chain ${m[2]}` : ""}` : null });
     this.draw();
   }
   frameCount() { return this.frames.length; }

@@ -58,11 +58,28 @@ def main(work: Path):
     state = read_state(work / "state.csv")
     pdb = app.PDBFile(str(work / "system.pdb"))
     u = mda.Universe(pdb.topology, str(work / "traj.dcd"))
+    chain_of = [r.chain.id for r in pdb.topology.residues()]
+    u.residues.resids = [int(r.id) for r in pdb.topology.residues()]  # the original PDB numbering (MDAnalysis would number chain B on from chain A)
     # PDB residue naming from OpenMM is kept; the ligand is residue LIG, polymer is "protein"
     prot, lig = u.select_atoms("protein"), u.select_atoms("resname LIG")
     n = len(u.trajectory)
     dt_ps = meta["report_ps"]
     times = np.arange(1, n + 1) * dt_ps
+
+    # keep every protein chain and the ligand in the same periodic image as the first chain (chains are separate molecules,
+    # so older / wrapped trajectories can have them in different images, tens of angstroms apart)
+    frags = u.select_atoms("protein or resname LIG").fragments
+
+    def image_together(ts):
+        box = ts.dimensions[:3]
+        if box.min() <= 0:
+            return ts
+        anchor = frags[0].center_of_geometry()
+        for f in frags[1:]:
+            f.translate(-np.round((f.center_of_geometry() - anchor) / box) * box)
+        return ts
+
+    u.trajectory.add_transformations(image_together)
 
     # superpose on the protein backbone of frame 0 (in memory), so ligand motion is relative to the pocket
     align.AlignTraj(u, u, select="protein and backbone", in_memory=True).run()
@@ -120,7 +137,7 @@ def main(work: Path):
     res = {
         "meta": meta, "config": cfg, "times": lst(times, 2),
         "rmsd": {"protein": lst(bb.results.rmsd[:, 2]), "ligand": lst(lrmsd)},
-        "rmsf": {"res": [int(r.resid) for r in ca.residues], "chain": [str(r.segid or "") for r in ca.residues], "value": [round(float(x), 3) for x in rmsf]},
+        "rmsf": {"res": [int(r.resid) for r in ca.residues], "chain": [chain_of[i] for i in ca.residues.resindices], "value": [round(float(x), 3) for x in rmsf]},
         "rg": lst(rg), "com_dist": lst(com_d), "min_dist": lst(min_d), "contacts": [int(x) for x in thin(contacts)],
         "state": {"time": lst(t_ps, 2), "potential": lst(pot, 1), "kinetic": lst(kin, 1), "total": lst(tot, 1), "temperature": lst(temp, 2),
                   "density": lst(dens, 4), "volume": lst(state["Box Volume (nm^3)"], 3) if "Box Volume (nm^3)" in state else []},

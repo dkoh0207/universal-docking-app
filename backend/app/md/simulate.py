@@ -176,7 +176,7 @@ def main(work: Path):
     frame_steps = max(1, round(cfg["report_ps"] * steps_per_ps))
     total_steps = round(cfg["production_ns"] * 1000 * steps_per_ps)
     n_frames = total_steps // frame_steps
-    sim.reporters.append(app.DCDReporter(str(work / "traj.dcd"), frame_steps))
+    sim.reporters.append(app.DCDReporter(str(work / "traj.dcd"), frame_steps, enforcePeriodicBox=False)  # wrapping would put each chain of a dimer into its own box image)
     sim.reporters.append(app.StateDataReporter(
         str(work / "state.csv"), frame_steps, time=True, potentialEnergy=True, kineticEnergy=True, totalEnergy=True,
         temperature=True, volume=True, density=True, speed=True))
