@@ -21,7 +21,7 @@ HOST="${HOST:-127.0.0.1}"
 IS_WIN=0
 case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) IS_WIN=1 ;; esac
 if [ $IS_WIN = 1 ]; then PY="$ROOT/backend/.env/python.exe"; else PY="$ROOT/backend/.env/bin/python"; fi
-# Node and npm come from frontend/.env, the engines from backend/.env, so nothing system-wide is required
+# Node and pnpm come from frontend/.env, the engines from backend/.env, so nothing system-wide is required
 if [ $IS_WIN = 1 ]; then export PATH="$ROOT/frontend/.env:$ROOT/backend/.env:$ROOT/backend/.env/Library/bin:$PATH"; else export PATH="$ROOT/frontend/.env/bin:$ROOT/backend/.env/bin:$PATH"; fi
 VITE="$ROOT/frontend/node_modules/vite/bin/vite.js"
 
@@ -79,8 +79,8 @@ check_mode() { case "${1:-dev}" in dev | prod) ;; *) die "unknown mode '$1' (use
 
 # ---------------------------------------------------------------- start
 need_setup() {
-  [ -x "$PY" ] || [ -f "$PY" ] || die "backend/.env is missing - run 'npm run setup' first"
-  [ -f "$VITE" ] || die "frontend dependencies are missing - run 'npm run setup' first"
+  [ -x "$PY" ] || [ -f "$PY" ] || die "backend/.env is missing - run 'pnpm run setup' first"
+  [ -f "$VITE" ] || die "frontend dependencies are missing - run 'pnpm run setup' first"
 }
 
 launch() { # pidfile dir log cmd...  -> starts a detached process and writes its (Windows) pid to the pidfile
@@ -143,7 +143,7 @@ cmd_start() {
   if [ "$mode" = prod ] && [ $build = 1 ]; then
     say "building the frontend..."
     mkdir -p "$LOGS"
-    (cd "$ROOT" && npm --prefix frontend run build >"$LOGS/build.log" 2>&1) || { die "build failed (see .run/logs/build.log)"; }
+    (cd "$ROOT" && pnpm --dir frontend run build >"$LOGS/build.log" 2>&1) || { die "build failed (see .run/logs/build.log)"; }
   fi
   [ "$mode" = prod ] && [ ! -f "$ROOT/frontend/dist/index.html" ] && die "frontend/dist is missing - run without --no-build"
   mkdir -p "$LOGS"
@@ -229,7 +229,7 @@ Usage: ./server.sh <command> [args]
 
 PIDs are kept in .run/<mode>-<name>.pid, logs in .run/logs/<mode>-<name>.log.
 Ports: WEB_PORT=$WEB_PORT  BACKEND_PORT=$BACKEND_PORT  PROD_PORT=$PROD_PORT (environment variables override them).
-First time? Run 'npm run setup'.
+First time? Run 'pnpm run setup'.
 EOF
 }
 

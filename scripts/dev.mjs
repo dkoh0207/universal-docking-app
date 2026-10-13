@@ -45,7 +45,7 @@ process.on("SIGTERM", () => stop());
 if (existsSync(python)) {
   start("api", "35", python, ["-m", "uvicorn", "app.main:app", "--port", port], { cwd: join(root, "backend") });
 } else {
-  console.log("\x1b[33m[dev]\x1b[0m backend/.env not found - starting the frontend only. Run `npm run setup` to enable docking.");
+  console.log("\x1b[33m[dev]\x1b[0m backend/.env not found - starting the frontend only. Run `pnpm run setup` to enable docking.");
 }
 if (existsSync(vite)) start("web", "36", existsSync(envNode) ? envNode : process.execPath, [vite], { cwd: join(root, "frontend") });
-else { console.log("[31m[dev][0m frontend dependencies missing - run `npm run setup`."); stop(1); }
+else { console.log("[31m[dev][0m frontend dependencies missing - run `pnpm run setup`."); stop(1); }

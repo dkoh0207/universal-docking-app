@@ -1,9 +1,10 @@
 # Node toolchain for the frontend, in its own env (frontend/.env) because Node 22.12+ (needed by Vite 8) cannot be
 # solved together with backend/environment.yml: smina pins boost 1.82, which pins ICU 73, and newer Node needs a later ICU.
-# `npm run setup` creates it (conda create -p frontend/.env --override-channels -c conda-forge <dependencies below>).
+# `pnpm run setup` creates it (conda create -p frontend/.env --override-channels -c conda-forge <dependencies below>).
 name: pymol-web-frontend
 channels:
   - conda-forge
   - nodefaults
 dependencies:
   - nodejs>=22.12,<23
+  - pnpm>=10

@@ -2,7 +2,7 @@
 
 Work happens in place in `/mnt/c/Users/user/pymol-viewer` (WSL, Ubuntu 24.04, RTX 5060 passthrough). The user reviews in a Windows browser at http://localhost:5179/ (Docking: `/#dock`; fallback: WSL IP from `hostname -I`). Preferences: Sonnet 5.5; everything confined to conda envs where possible; do NOT suggest the Claude in Chrome extension; no mobile support; keep replies short, and the user interrupts long tool calls (prefer small steps).
 
-**Package manager: pnpm only (user preference). Never use npm/npx.**
+**Package manager: pnpm only (user preference). Never use npm/npx.** Migrated: pnpm 10 is in `frontend/environment.yml`, `frontend/pnpm-lock.yaml` replaces `package-lock.json`, `frontend/.npmrc` uses `node-linker=hoisted`. When running pnpm by hand put `frontend/.env/bin` first on PATH (the Windows pnpm on PATH runs scripts via cmd.exe and fails).
 
 ## Done
 - **Engines (backend)**: `backend/app/engines.py` registry (vina, smina via conda, GNINA 1.3.3 opt-in download + conda cuDNN), engine-aware `/api/dock/*`, `redock_1hsg.py --engine`. Redock baselines (1HSG/MK1, exh 8, seed 42): Vina -11.51 kcal/mol 0.36 Å; smina -12.96 0.45 Å; GNINA -12.04 0.84 Å (CNN-ranked, runs on the GPU).

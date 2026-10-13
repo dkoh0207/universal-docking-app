@@ -10,3 +10,4 @@ __pycache__/
 .vite/
 *.log
 .DS_Store
+.pnpm-store/

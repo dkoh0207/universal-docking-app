@@ -27,7 +27,7 @@ server.sh   background dev/prod server manager
 | Tool | Version | Notes |
 |------|---------|-------|
 | [Git](https://git-scm.com/) | any | on Windows, Git for Windows also provides **Git Bash**, which `server.sh` needs |
-| [Node.js](https://nodejs.org/) | 20+ (tested on 24) | Node ships with the conda env; use pnpm (not npm) for all JS commands |
+| [Node.js](https://nodejs.org/) | 20+ (tested on 24) | Node ships with the conda env; pnpm 10 also comes from the conda env; use pnpm (not npm) for all JS commands |
 | [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or Anaconda | any | used to create the backend's Python env; does not need to be on `PATH` (setup also looks in `~/miniconda3` and `~/anaconda3`, or set `CONDA_EXE`) |
 
 Tested on Windows 11. The Linux/macOS code paths exist but have not been tested.
@@ -42,7 +42,7 @@ pnpm run setup
 
 `pnpm run setup` installs everything inside the project folder and is safe to re-run. It does three things:
 
-1. Installs the frontend packages (`pnpm install --frozen-lockfile` in `frontend/`).
+1. Installs the frontend packages (`pnpm install --frozen-lockfile` in `frontend/`, lockfile `frontend/pnpm-lock.yaml`; `frontend/.npmrc` sets `node-linker=hoisted` so `node_modules` has no symlinks and works on `/mnt` and Windows).
 2. Creates the Python env `backend/.env` from `backend/environment.yml`, using conda-forge only. This takes a few minutes the first time.
 3. Downloads AutoDock Vina from the [official releases](https://github.com/ccsb-scripps/AutoDock-Vina/releases) to `tools/vina/`, using the version in `backend/tools.json`.
 

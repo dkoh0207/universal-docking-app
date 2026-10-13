@@ -33,7 +33,7 @@ function ensureEnv({ dir, spec, probe, label }) {
   const have = existsSync(probe);
   if (have && existsSync(stamp) && readFileSync(stamp, "utf8").trim() === hash) { console.log(`==> ${label} environment: ok`); return; }
   const conda = findConda();
-  if (!conda) { console.error("conda not found. Install Miniconda (https://docs.conda.io/en/latest/miniconda.html) and re-run `npm run setup`."); process.exit(1); }
+  if (!conda) { console.error("conda not found. Install Miniconda (https://docs.conda.io/en/latest/miniconda.html) and re-run `pnpm run setup`."); process.exit(1); }
   // the package list comes from the yml, but is installed with --override-channels so only conda-forge is
   // used (`conda env create` would also pull in Anaconda's default channels, which need a ToS acceptance)
   // some conda-forge packages (e.g. typer) contain ~150-character paths, past Windows' 260-character limit in a deep folder
@@ -50,15 +50,15 @@ ensureEnv({ dir: envDir, spec: join(root, "backend", "environment.yml"), label: 
 const nodeDir = join(root, "frontend", ".env");
 ensureEnv({ dir: nodeDir, spec: join(root, "frontend", "environment.yml"), label: "Node", probe: win ? join(nodeDir, "node.exe") : join(nodeDir, "bin", "node") });
 
-// ---- frontend dependencies (npm comes from the Node env)
+// ---- frontend dependencies (pnpm comes from the Node env)
 const envPath = { ...process.env, PATH: [envBinDir(nodeDir), win ? nodeDir : "", process.env.PATH].filter(Boolean).join(win ? ";" : ":") };
 if (!existsSync(join(root, "frontend", "node_modules"))) {
   console.log("==> Installing frontend dependencies");
-  run("npm --prefix frontend ci", [], { shell: true, env: envPath });
+  run("pnpm --dir frontend install --frozen-lockfile", [], { shell: true, env: envPath });
 } else console.log("==> Frontend dependencies: ok");
 
 // ---- downloaded docking engines (backend/tools.json). smina comes from conda (environment.yml). Optional ones, such as
-// GNINA (~2 GB), are installed only with `npm run setup -- --gnina` (or `--all`).
+// GNINA (~2 GB), are installed only with `pnpm run setup -- --gnina` (or `--all`).
 const toolSpecs = JSON.parse(readFileSync(join(root, "backend", "tools.json"), "utf8"));
 const wanted = (id) => !toolSpecs[id].optional || process.argv.includes(`--${id}`) || process.argv.includes("--all");
 const binPath = {};
@@ -95,4 +95,4 @@ const smina = join(envDir, win ? "Library/bin/smina.exe" : "bin/smina");
 
 process.env.LD_LIBRARY_PATH = `${join(envDir, "lib")}:${process.env.LD_LIBRARY_PATH ?? ""}`;
 for (const bin of [binPath.vina, smina, binPath.gnina, obabel]) if (existsSync(bin)) console.log(out(bin, [bin === obabel ? "-V" : "--version"]).split("\n")[0]);
-console.log("\nSetup complete. Start everything with `npm run dev`.");
+console.log("\nSetup complete. Start everything with `pnpm run dev`.");
