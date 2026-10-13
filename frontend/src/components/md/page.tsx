@@ -205,7 +205,7 @@ export function MdStage() {
   const nFrames = ctl.frameCount();
   return (
     <main className="flex min-h-0 min-w-0 flex-col gap-2.5 overflow-y-auto">
-      <SceneHost scene={mdScene} host={mdHost} wrapRef={wrap} className="min-h-[340px] flex-none basis-[46%]">
+      <SceneHost scene={mdScene} host={mdHost} wrapRef={wrap} className="aspect-square min-h-0 w-[min(100%,calc(100dvh-80px))] flex-none self-center">
         {!r && !s.running && (
           <div className="pointer-events-none absolute inset-0 z-[4] flex flex-col items-center justify-center gap-1.5 p-5 text-center">
             <Activity className="mb-1.5 size-11 stroke-[1.5] text-primary" />
