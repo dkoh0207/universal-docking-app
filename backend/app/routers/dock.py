@@ -68,6 +68,11 @@ async def create_job(req: DockRequest):
 
 @router.get("/jobs/{job_id}/events")
 async def events(job_id: str, request: Request):
+    return await events_stream(job_id, request)
+
+
+async def events_stream(job_id: str, request: Request):
+    """Server-sent events of a job (shared with the MD router)."""
     job = manager.get(job_id)
     if not job:
         raise HTTPException(404, "Unknown job")

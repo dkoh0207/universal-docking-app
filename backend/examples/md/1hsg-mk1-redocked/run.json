@@ -1,0 +1,12 @@
+{
+ "name": "1HSG \u00b7 indinavir (MK1), redocked Vina pose",
+ "created": "2026-10-13T14:19:00",
+ "receptor": "1HSG",
+ "ligand": "Docked pose 1 (-11.5 kcal/mol)",
+ "production_ns": 0.1,
+ "frames": 10,
+ "platform": "CUDA",
+ "atoms": 47014,
+ "checks_ok": 7,
+ "checks": 7
+}

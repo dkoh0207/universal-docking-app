@@ -48,7 +48,7 @@ class Job:
             if event in TERMINAL:
                 return
 
-    async def run(self, args: list[str], env: dict[str, str] | None = None, on_output: Callable[[str], Awaitable[None]] | None = None) -> tuple[int, str]:
+    async def run(self, args: list[str], env: dict[str, str] | None = None, on_output: Callable[[str], Awaitable[None]] | None = None, cwd: Path | None = None) -> tuple[int, str]:
         """Run a subprocess, feeding decoded output chunks to `on_output`; returns (exit code, full output).
 
         Uses Popen plus a reader thread rather than asyncio subprocesses: those need a Proactor loop on Windows,
@@ -56,7 +56,7 @@ class Job:
         """
         loop = asyncio.get_running_loop()
         proc = subprocess.Popen(
-            args, cwd=self.dir, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            args, cwd=cwd or self.dir, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
         self._procs.add(proc)
         chunks: asyncio.Queue[bytes | None] = asyncio.Queue()

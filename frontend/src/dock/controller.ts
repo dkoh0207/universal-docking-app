@@ -12,7 +12,7 @@ import { CNN_SCORING, ENGINES, ENGINE_IDS, POSE_SORT, type EngineId, type Mode }
 import { bounds, heavyAtoms, pdbqtToPdb, rmsdNearest, splitModels, toPdb } from "./pdb";
 
 export type Src = "structure" | "upload" | "smiles";
-export interface Results { text: string; modes: Mode[]; models: string[]; refRmsd: (number | null)[]; shown: number; engine: EngineId }
+export interface Results { text: string; modes: Mode[]; models: string[]; refRmsd: (number | null)[]; shown: number; engine: EngineId; rescoring?: boolean }
 export interface Ligand { key: string; label: string; n: number }
 export interface LegendItem { color: string; key: Key; n?: number }
 
@@ -41,6 +41,7 @@ interface Deps {
   dock: Scene;
   run: (cmd: string) => Promise<boolean>; // PyMOL commands on the dock scene
   toViewer: (obj: PObject) => void;
+  select: (obj: PObject) => void; // make this the shared active structure (the Viewer's current object)
   openViewer: () => void;
 }
 
@@ -169,6 +170,7 @@ export class DockController {
   setReceptor(name: string) {
     const obj = this.objs().find((o) => o.name === name) ?? null;
     this.set({ receptor: name });
+    if (obj) this.deps.select(obj);
     if (obj !== this.recObj) {
       this.recObj = obj;
       this.set({ ligKey: null });
@@ -191,6 +193,20 @@ export class DockController {
     if (!best) { toast(t("dock.noPocket")); return; }
     this.pickLigand(best);
     if (this.visible) this.zoomFocus();
+  }
+
+  /** The complex for an MD run: receptor PDB plus the ligand choices (crystal ligand, each docked pose) as PDB text. */
+  mdInputs() {
+    if (!this.recObj) return null;
+    const crystal = this.s.src === "structure" ? this.ligandAtoms() : [];
+    const options: { id: string; label: string; pdb: string }[] = [];
+    if (crystal.length) options.push({ id: "crystal", label: t("md.crystal"), pdb: toPdb(crystal) });
+    const r = this.s.results;
+    r?.models.forEach((m, i) => options.push({ id: `pose_${i + 1}`, label: t("md.pose", { n: i + 1, aff: r.modes[i]?.affinity.toFixed(1) ?? "?" }), pdb: pdbqtToPdb(m) }));
+    return {
+      receptor: this.recObj.name, receptorPdb: toPdb(this.receptorAtoms()), options,
+      resname: this.s.src === "structure" ? this.s.ligKey?.split("|")[3] ?? "" : "", smiles: this.s.src === "smiles" ? this.s.smiles.trim() : "",
+    };
   }
 
   setReceptorOptions(patch: { noWater?: boolean; keepHet?: boolean }) {
@@ -428,6 +444,28 @@ export class DockController {
     this.showPose(0);
     this.deps.run(`zoom pose_1${this.dock.objects.some((o) => o.name === "ref_ligand") ? " or ref_ligand" : ""}`); // crystal ligand stays as the overlay
     if (modes.length) toast(t("dock.done", { aff: modes[0].affinity.toFixed(1) }));
+  }
+
+  /** Rescore the docked poses with AEV-PLIG (a GNN predicting pKd); adds a column to the results table. */
+  async rescore() {
+    const r = this.s.results;
+    if (!r || r.rescoring) return;
+    this.set({ results: { ...r, rescoring: true } });
+    const stop = (modes?: Mode[]) => { const c = this.s.results; if (c) this.set({ results: { ...c, rescoring: false, ...(modes ? { modes } : {}) } }); };
+    try {
+      const { id } = await api<{ id: string }>("/rescore/jobs", { json: { receptor_pdb: toPdb(this.receptorAtoms()), poses: r.text, scorer: "aev_plig" } });
+      const close = subscribe(`/rescore/jobs/${id}/events`, {
+        done: (d) => {
+          close();
+          const cur = this.s.results;
+          stop(cur?.modes.map((m, i) => ({ ...m, aev_plig: d.scores[i] ?? undefined })));
+        },
+        error: (d) => { close(); stop(); toast(translateError(d.message), "err"); },
+      }, () => { close(); stop(); toast(t("dock.lost"), "err"); });
+    } catch (e) {
+      stop();
+      toast((e as Error).message, "err");
+    }
   }
 
   showPose(i: number) {

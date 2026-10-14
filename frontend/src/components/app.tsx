@@ -1,6 +1,7 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { DockSidebar, DockStage } from "@/components/dock/page";
+import { MdSidebar, MdStage } from "@/components/md/page";
 import { TopBar } from "@/components/topbar";
 import { ViewerSidebar } from "@/components/viewer/sidebar";
 import { ViewerStage } from "@/components/viewer/stage";
@@ -19,6 +20,7 @@ export function App() {
         <TopBar />
         <div className={pane("viewer")}><ViewerSidebar /><ViewerStage /></div>
         <div className={pane("dock")}><DockSidebar /><DockStage /></div>
+        <div className={pane("md")}><MdSidebar /><MdStage /></div>
       </div>
       <Toaster position="bottom-right" />
     </TooltipProvider>

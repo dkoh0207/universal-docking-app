@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Anchor, Atom, ChevronDown, FlaskConical, Languages, Moon, Search, Sun, Upload } from "lucide-react";
+import { Activity, Anchor, Atom, ChevronDown, FlaskConical, Languages, Moon, Search, Sun, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ export function TopBar() {
         <TabsList className={cn(switchClass, "h-auto")}>
           <TabsTrigger value="viewer" className="h-7 px-3 text-[12.5px] font-semibold data-active:bg-primary data-active:text-primary-foreground"><Atom />{t("tab.viewer")}</TabsTrigger>
           <TabsTrigger value="dock" className="h-7 px-3 text-[12.5px] font-semibold data-active:bg-primary data-active:text-primary-foreground"><Anchor />{t("tab.dock")}</TabsTrigger>
+          <TabsTrigger value="md" className="h-7 px-3 text-[12.5px] font-semibold data-active:bg-primary data-active:text-primary-foreground"><Activity />{t("tab.md")}</TabsTrigger>
         </TabsList>
       </Tabs>
 

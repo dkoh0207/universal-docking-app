@@ -1,0 +1,18 @@
+{
+  "target": "BTK (UniProt Q06187), residues in UniProt numbering",
+  "polar": {
+    "must": [{"res": "MET477", "types": ["HBAcceptor", "HBDonor"], "note": "hinge backbone; seen in 12/12 reference complexes (HBAcceptor, ligand donates)"}],
+    "optional": [{"res": "GLU475", "types": ["HBDonor", "HBAcceptor"]}, {"res": "THR474", "types": ["HBDonor", "HBAcceptor"], "note": "gatekeeper"},
+                 {"res": "LYS430", "types": ["HBDonor", "HBAcceptor"]}, {"res": "ASP539", "types": ["HBDonor", "HBAcceptor"], "note": "DFG"}]
+  },
+  "hydrophobic": {
+    "residues": ["LEU408", "VAL416", "ALA428", "LEU528", "PHE413", "TYR476", "LEU460", "PHE540"],
+    "min_count": 2
+  },
+  "evidence": {
+    "pmids": {"37950076": "Leu528, Val416, Met477 key in docking/MD", "36914235": "hinge Met477, Glu475; Val416, Lys430, Asp539; Thr474, Cys481",
+              "40886252": "Glu475 and Met477 targeted by the reference inhibitor", "26699616": "Thr474 gatekeeper, Met477 hinge, Leu408, Arg525",
+              "41354254": "Thr474 and Met477 hydrogen bonds"},
+    "crystal_consensus": "ProLIF over 12 reversible/non-covalent BTK complexes (5T18 4OT5 4OTQ 6O8I 5U9D 6E4F 7N4Q 6VXQ 6DI1 3GEN 3K54 4RFZ): Met477 H-bond 100%, Val416 50%, Leu408 50%, Glu475 50%, Phe413 42%, Tyr476/Gln412/Lys430/Asp539 33%"
+  }
+}

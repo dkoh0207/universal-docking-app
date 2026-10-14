@@ -5,10 +5,12 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from . import tools
-from .routers import dock
+from .routers import dock, md, rescore
 
 app = FastAPI(title="PyMOL Web backend")
 app.include_router(dock.router, prefix="/api")
+app.include_router(md.router, prefix="/api")
+app.include_router(rescore.router, prefix="/api")
 
 
 @app.get("/api/health")

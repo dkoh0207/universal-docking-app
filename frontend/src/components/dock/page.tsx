@@ -273,6 +273,7 @@ function ResultsCard() {
   if (!r) return null;
   const hasRef = r.refRmsd.some((v) => v !== null);
   const hasCnn = r.modes.some((m) => m.cnn_score !== undefined);
+  const hasAev = r.modes.some((m) => m.aev_plig !== undefined);
   const hasRmsd = r.engine !== "gnina"; // GNINA does not report RMSD bounds
   const contacts = ctl.contactsShown();
   const head = "h-6 px-2 text-right text-[10.5px] font-semibold tracking-[0.04em] text-faint uppercase";
@@ -285,6 +286,7 @@ function ResultsCard() {
             <TableHead className={head}>{t("dock.col.aff")}</TableHead>
             {hasCnn && <TableHead className={head}>{t("dock.col.cnn")}</TableHead>}
             {hasCnn && <TableHead className={head}>{t("dock.col.cnnAff")}</TableHead>}
+            {hasAev && <TableHead className={head} title={t("dock.col.aevTitle")}>{t("dock.col.aev")}</TableHead>}
             {hasRmsd && <TableHead className={head}>{t("dock.col.lb")}</TableHead>}
             {hasRmsd && <TableHead className={head}>{t("dock.col.ub")}</TableHead>}
             {hasRef && <TableHead className={head} title={t("dock.col.refTitle")}>{t("dock.col.ref")}</TableHead>}
@@ -301,6 +303,7 @@ function ResultsCard() {
                 <TableCell className={cell}>{m.affinity.toFixed(1)}</TableCell>
                 {hasCnn && <TableCell className={cell}>{m.cnn_score?.toFixed(2) ?? "–"}</TableCell>}
                 {hasCnn && <TableCell className={cell}>{m.cnn_affinity?.toFixed(2) ?? "–"}</TableCell>}
+                {hasAev && <TableCell className={cell}>{m.aev_plig?.toFixed(2) ?? "–"}</TableCell>}
                 {hasRmsd && <TableCell className={cell}>{m.rmsd_lb.toFixed(2)}</TableCell>}
                 {hasRmsd && <TableCell className={cell}>{m.rmsd_ub.toFixed(2)}</TableCell>}
                 {hasRef && <TableCell className={cell}>{r.refRmsd[i] === null ? "–" : r.refRmsd[i]!.toFixed(2)}</TableCell>}
@@ -317,6 +320,9 @@ function ResultsCard() {
         </Button>
         <Button variant="outline" size="lg" className="bg-secondary px-1.5 text-xs" onClick={() => ctl.sendToViewer()}><Send />{t("dock.send")}</Button>
       </div>
+      <Button variant="outline" size="lg" className="bg-secondary" disabled={r.rescoring} onClick={() => ctl.rescore()}>
+        <Trophy />{t(r.rescoring ? "dock.rescoring" : "dock.rescore")}
+      </Button>
       <Button variant="outline" size="lg" className="bg-secondary" onClick={() => ctl.download()}><Download />{t("dock.download")}</Button>
     </SidebarCard>
   );

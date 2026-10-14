@@ -19,4 +19,4 @@ export const ENGINES: Record<EngineId, EngineInfo> = {
 };
 export const ENGINE_IDS = Object.keys(ENGINES) as EngineId[];
 
-export interface Mode { mode: number; affinity: number; rmsd_lb: number; rmsd_ub: number; cnn_score?: number; cnn_affinity?: number }
+export interface Mode { mode: number; affinity: number; rmsd_lb: number; rmsd_ub: number; cnn_score?: number; cnn_affinity?: number; aev_plig?: number } // aev_plig: pKd from the AEV-PLIG rescoring
