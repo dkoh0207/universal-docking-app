@@ -12,7 +12,7 @@ import { CNN_SCORING, ENGINES, ENGINE_IDS, POSE_SORT, type EngineId, type Mode }
 import { bounds, heavyAtoms, pdbqtToPdb, rmsdNearest, splitModels, toPdb } from "./pdb";
 
 export type Src = "structure" | "upload" | "smiles";
-export interface Results { text: string; modes: Mode[]; models: string[]; refRmsd: (number | null)[]; shown: number; engine: EngineId }
+export interface Results { text: string; modes: Mode[]; models: string[]; refRmsd: (number | null)[]; shown: number; engine: EngineId; rescoring?: boolean }
 export interface Ligand { key: string; label: string; n: number }
 export interface LegendItem { color: string; key: Key; n?: number }
 
@@ -444,6 +444,28 @@ export class DockController {
     this.showPose(0);
     this.deps.run(`zoom pose_1${this.dock.objects.some((o) => o.name === "ref_ligand") ? " or ref_ligand" : ""}`); // crystal ligand stays as the overlay
     if (modes.length) toast(t("dock.done", { aff: modes[0].affinity.toFixed(1) }));
+  }
+
+  /** Rescore the docked poses with AEV-PLIG (a GNN predicting pKd); adds a column to the results table. */
+  async rescore() {
+    const r = this.s.results;
+    if (!r || r.rescoring) return;
+    this.set({ results: { ...r, rescoring: true } });
+    const stop = (modes?: Mode[]) => { const c = this.s.results; if (c) this.set({ results: { ...c, rescoring: false, ...(modes ? { modes } : {}) } }); };
+    try {
+      const { id } = await api<{ id: string }>("/rescore/jobs", { json: { receptor_pdb: toPdb(this.receptorAtoms()), poses: r.text, scorer: "aev_plig" } });
+      const close = subscribe(`/rescore/jobs/${id}/events`, {
+        done: (d) => {
+          close();
+          const cur = this.s.results;
+          stop(cur?.modes.map((m, i) => ({ ...m, aev_plig: d.scores[i] ?? undefined })));
+        },
+        error: (d) => { close(); stop(); toast(translateError(d.message), "err"); },
+      }, () => { close(); stop(); toast(t("dock.lost"), "err"); });
+    } catch (e) {
+      stop();
+      toast((e as Error).message, "err");
+    }
   }
 
   showPose(i: number) {

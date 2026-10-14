@@ -25,7 +25,7 @@ from app import interactions  # noqa: E402
 
 # (name, key in the score table, sign: +1 higher is better, -1 lower is better)
 SCORERS = [("dock", "dock", -1), ("vina", "vina", -1), ("vinardo", "vinardo", -1), ("ad4", "ad4_scoring", -1), ("dkoes_fast", "dkoes_fast", -1),
-           ("dkoes", "dkoes_scoring", -1), ("cnn_score", "cnn_score", 1), ("cnn_affinity", "cnn_affinity", 1), ("cnn_vs", "cnn_vs", 1),
+           ("dkoes", "dkoes_scoring", -1), ("cnn_score", "cnn_score", 1), ("cnn_affinity", "cnn_affinity", 1), ("cnn_vs", "cnn_vs", 1), ("aev_plig", "aev_plig", 1),
            ("interactions", "ints", 1)]
 FAIL_TIER = 1e3
 _state: dict = {}
@@ -97,6 +97,7 @@ def table(scores: dict, ints: dict, ids: list[str]) -> dict[str, list[dict]]:
             for key, sign in (("vina", -1), ("vinardo", -1), ("ad4_scoring", -1), ("dkoes_fast", -1), ("dkoes_scoring", -1)):
                 d[key] = sign * p[key] if p.get(key) is not None else None
             d["cnn_score"], d["cnn_affinity"] = p.get("cnn_score"), p.get("cnn_affinity")
+            d["aev_plig"] = p.get("aev_plig")
             d["cnn_vs"] = p["cnn_score"] * p["cnn_affinity"] if p.get("cnn_score") is not None and p.get("cnn_affinity") is not None else None
             v = (ints.get(lid) or [])
             v = v[i] if i < len(v) else {"ok": False, "ints": 0.0}

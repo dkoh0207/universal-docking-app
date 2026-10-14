@@ -3,7 +3,7 @@
     backend/.env/bin/python backend/benchmark/btk/rescore.py POSEDIR [--workers 28] [--no-gnina]
 POSEDIR = .run/btk/poses/<receptor>/<engine>-<scoring>; writes <POSEDIR>/../../scores/<receptor>/<engine>-<scoring>.json
 {ligand id: [{"dock": engine score, "vina": ..., "vinardo": ..., "ad4_scoring": ..., "dkoes_fast": ..., "dkoes_scoring": ...,
-              "cnn_score": ..., "cnn_affinity": ..., "cnn_var": ...} per pose]}
+              "cnn_score": ..., "cnn_affinity": ..., "cnn_var": ..., "aev_plig": pKd (with --aev-plig)} per pose]}
 """
 
 import argparse
@@ -97,6 +97,7 @@ def main():
     ap.add_argument("--workers", type=int, default=28)
     ap.add_argument("--no-gnina", action="store_true")
     ap.add_argument("--no-smina", action="store_true")
+    ap.add_argument("--aev-plig", action="store_true", help="also score every pose with AEV-PLIG (pKd; needs tools/aev-plig)")
     a = ap.parse_args()
     posedir = Path(a.posedir).resolve()
     receptor_id, tag = posedir.parent.name, posedir.name
@@ -123,6 +124,16 @@ def main():
                 if j < len(scores[lid]):
                     scores[lid][j].update(d)
         print(f"[{time.time() - t0:5.0f}s] gnina done ({len(g)} ligands scored)", flush=True)
+    if a.aev_plig:
+        from app import scoring
+
+        with tempfile.TemporaryDirectory() as td:
+            aev = scoring.score_batch((RUN / "receptors" / receptor_id / "receptor.pdb").read_text(),
+                                      {i: posedir.joinpath(f"{i}.pdbqt").read_text() for i in ids}, Path(td), a.workers)
+        for lid, vals in aev.items():
+            for j, v in enumerate(vals[: len(scores[lid])]):
+                scores[lid][j]["aev_plig"] = v
+        print(f"[{time.time() - t0:5.0f}s] aev-plig done", flush=True)
     out = RUN / "scores" / receptor_id
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{tag}.json").write_text(json.dumps(scores))

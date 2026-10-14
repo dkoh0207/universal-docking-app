@@ -29,7 +29,10 @@ def dock_one(args):
     if out.exists():
         return row["id"], "cached", 0.0
     t = time.time()
-    info = prep_ligand(row, lig_dir())
+    try:
+        info = prep_ligand(row, lig_dir())
+    except subprocess.TimeoutExpired:
+        return row["id"], "ligand prep timed out", time.time() - t
     if info is None:
         return row["id"], "ligand prep failed", 0.0
     engine = engines.ENGINES[eng_id]
@@ -41,7 +44,10 @@ def dock_one(args):
     (work / "ligand.pdbqt").write_text((lig_dir() / f"{row['id']}.pdbqt").read_text())
     (work / "receptor.pdbqt").write_text((RUN / "receptors" / rec["pdb"] / "receptor.pdbqt").read_text())
     cmd = engines.build_args(engine, binary, req)
-    r = subprocess.run(cmd, cwd=work, capture_output=True, text=True, env=tools.tool_env(binary), timeout=1800)
+    try:
+        r = subprocess.run(cmd, cwd=work, capture_output=True, text=True, env=tools.tool_env(binary), timeout=1800)
+    except subprocess.TimeoutExpired:
+        return row["id"], "engine timed out", time.time() - t
     res = work / ("unidock_out" if eng_id == "unidock" else "out.pdbqt")
     if eng_id == "unidock":
         res = next(iter((work / "unidock_out").glob("*.pdbqt")), None)

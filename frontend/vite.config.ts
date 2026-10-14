@@ -11,6 +11,6 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   build: { chunkSizeWarningLimit: 2500 },
-  server: { port: 5179, strictPort: true, proxy, watch: polling ? { usePolling: true, interval: 300 } : undefined },
+  server: { host: process.env.HOST || "127.0.0.1", port: 5179, strictPort: true, proxy, watch: polling ? { usePolling: true, interval: 300 } : undefined },
   preview: { proxy },
 });
